@@ -111,7 +111,8 @@ def main():
         print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
         return 1
     saved = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
-    players = saved.get("players", {})
+    # a copy: comparing the new state with a dict changed in place would never see a change
+    players = json.loads(json.dumps(saved.get("players", {})))
     if "name" in saved:  # Stand aus der Version für einen Spieler übernehmen
         players[saved["name"]] = {k: v for k, v in saved.items() if k not in ("name", "checked")}
 
@@ -147,7 +148,7 @@ def main():
     embeds, joined, errors = [], [], 0
     # Joins and leaves go out at once; anything else (a mode change) waits and goes out at most
     # once an hour, only its newest card per player.
-    pending = saved.get("pending", {})
+    pending = dict(saved.get("pending", {}))
     last_quiet = saved.get("lastQuiet", 0)
     now = int(time.time())
     for name in names:
