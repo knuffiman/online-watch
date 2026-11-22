@@ -128,8 +128,12 @@ def main():
         if not uid:
             print(f"TEST_PING: no Discord ID for {test}")
             return 1
-        post(webhook, [], [({"title": f"🧪 Test ping for {test}", "color": BLUE,
-                             "description": "This is how a join ping looks. Nothing else changed."}, uid)])
+        # the real card with live data, as if the player had just joined (offline: "was online");
+        # the saved state is left alone
+        name = next((n for n in names if n.lower() == test.lower()), test)
+        _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key)
+        card["footer"] = {"text": f"{card['footer']['text']} • test"}
+        post(webhook, [], [(card, uid)])
         print(f"test ping sent to {test}")
         return 0
     embeds, joined, errors = [], [], 0
