@@ -10,6 +10,7 @@ Variable (optional): PLAYERS - Spielernamen, durch Komma getrennt (Standard sieh
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -144,6 +145,11 @@ def main():
         print(f"test pings sent: {len(joined)}")
         return 0 if joined else 1
     embeds, joined, errors = [], [], 0
+    # Joins and leaves go out at once; anything else (a mode change) waits and goes out at most
+    # once an hour, only its newest card per player.
+    pending = saved.get("pending", {})
+    last_quiet = saved.get("lastQuiet", 0)
+    now = int(time.time())
     for name in names:
         old = players.get(name, {})
         try:
@@ -152,7 +158,11 @@ def main():
             print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
             errors += 1
             continue
-        if msg:
+        if msg and not overview and msg["title"].startswith("🔁"):
+            pending[name] = msg
+            print(f"{name}: {msg['title']} (waits for the hourly message)")
+        elif msg:
+            pending.pop(name, None)
             # only when the player has just come online - not again while they stay online
             if ping and ids.get(name.lower()):
                 joined.append((msg, ids[name.lower()]))
@@ -161,10 +171,18 @@ def main():
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
+    if pending and now - last_quiet >= 3600:
+        embeds += [pending[n] for n in names if n in pending]
+        pending = {}
+        last_quiet = now
     if embeds or joined:
         post(webhook, embeds, joined)
 
     new = {"players": {n: players[n] for n in names if n in players}}
+    if pending:
+        new["pending"] = pending
+    if last_quiet:
+        new["lastQuiet"] = last_quiet
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     return 2 if errors == len(names) else 0
