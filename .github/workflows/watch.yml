@@ -10,6 +10,10 @@ on:
         description: "Send an overview of all accounts"
         type: boolean
         default: true
+      test_ping:
+        description: "Only send a test ping to this player (e.g. Knuffiman)"
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -31,6 +35,7 @@ jobs:
           PLAYERS: ${{ vars.PLAYERS }}
           OVERVIEW: ${{ inputs.overview }}
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
+          TEST_PING: ${{ inputs.test_ping }}
         run: python3 watch.py
       - name: Save state
         run: |

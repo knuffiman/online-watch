@@ -118,6 +118,16 @@ def main():
             v = "".join(c for c in v if c.isdigit())
             if v:
                 ids[k.strip().lower()] = v
+    test = (os.environ.get("TEST_PING") or "").strip()
+    if test:
+        uid = ids.get(test.lower())
+        if not uid:
+            print(f"TEST_PING: no Discord ID for {test}")
+            return 1
+        post(webhook, [{"title": f"🧪 Test ping for {test}", "color": BLUE,
+                        "description": "This is how a join ping looks. Nothing else changed."}], [uid])
+        print(f"test ping sent to {test}")
+        return 0
     embeds, pings, errors = [], [], 0
     for name in names:
         old = players.get(name, {})
