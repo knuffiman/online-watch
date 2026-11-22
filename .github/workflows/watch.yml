@@ -2,8 +2,8 @@ name: Online Watch
 
 on:
   schedule:
-    # every 30 minutes (GitHub often starts scheduled runs a few minutes late)
-    - cron: "*/30 * * * *"
+    # every 5 minutes, the shortest GitHub allows (scheduled runs often start a few minutes late)
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       overview:
