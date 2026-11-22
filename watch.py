@@ -136,6 +136,8 @@ def main():
                 print(f"TEST_PING: no Discord ID for {name}")
                 continue
             _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key)
+            if card is None:  # offline and login times hidden in the API: the status card instead
+                _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key, True)
             card["footer"] = {"text": f"{card['footer']['text']} • test"}
             joined.append((card, uid))
         post(webhook, [], joined)
