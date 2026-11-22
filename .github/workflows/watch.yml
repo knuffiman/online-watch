@@ -11,7 +11,7 @@ on:
         type: boolean
         default: true
       test_ping:
-        description: "Only send a test ping to this player (e.g. Knuffiman)"
+        description: "Only send test pings: a player, several (comma) or all"
         type: string
         default: ""
 

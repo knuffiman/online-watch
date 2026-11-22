@@ -124,18 +124,23 @@ def main():
                 ids[k.strip().lower()] = v
     test = (os.environ.get("TEST_PING") or "").strip()
     if test:
-        uid = ids.get(test.lower())
-        if not uid:
-            print(f"TEST_PING: no Discord ID for {test}")
-            return 1
-        # the real card with live data, as if the player had just joined (offline: "was online");
-        # the saved state is left alone
-        name = next((n for n in names if n.lower() == test.lower()), test)
-        _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key)
-        card["footer"] = {"text": f"{card['footer']['text']} • test"}
-        post(webhook, [], [(card, uid)])
-        print(f"test ping sent to {test}")
-        return 0
+        # "all" or names separated by commas: the real card with live data for each, as if the
+        # player had just joined (offline: "was online"), each with its ping under it; the saved
+        # state is left alone
+        wanted = names if test.lower() == "all" else [t.strip() for t in test.split(",") if t.strip()]
+        joined = []
+        for t in wanted:
+            name = next((n for n in names if n.lower() == t.lower()), t)
+            uid = ids.get(name.lower())
+            if not uid:
+                print(f"TEST_PING: no Discord ID for {name}")
+                continue
+            _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key)
+            card["footer"] = {"text": f"{card['footer']['text']} • test"}
+            joined.append((card, uid))
+        post(webhook, [], joined)
+        print(f"test pings sent: {len(joined)}")
+        return 0 if joined else 1
     embeds, joined, errors = [], [], 0
     for name in names:
         old = players.get(name, {})
