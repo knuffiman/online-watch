@@ -27,9 +27,14 @@ def get(url, headers=None):
         return json.loads(r.read().decode("utf-8"))
 
 
-def post(webhook, embeds):
+def post(webhook, embeds, pings=()):
+    """Embeds don't ping; the mentions go into the message text, once, with the first batch."""
     for i in range(0, len(embeds), 10):  # Discord: höchstens 10 Embeds pro Nachricht
-        body = json.dumps({"username": "Online Watch", "embeds": embeds[i:i + 10]}).encode("utf-8")
+        payload = {"username": "Online Watch", "embeds": embeds[i:i + 10],
+                   "allowed_mentions": {"parse": [], "users": list(pings) if i == 0 else []}}
+        if pings and i == 0:
+            payload["content"] = " ".join(f"<@{p}>" for p in pings) + " joined Hypixel!"
+        body = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(webhook, data=body, method="POST",
                                      headers={**UA, "Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=20).close()
@@ -72,11 +77,13 @@ def check(name, old, key, overview=False):
     played = span(last_out - last_in) if last_in and last_out and last_out > last_in else None
 
     msg = None
+    ping = False
     if overview or "online" not in old:
         msg = embed(shown, uuid, f"📋 {shown}" if overview and "online" in old else f"👀 Now watching {shown}", BLUE,
                     [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
                      ("Last login", login), ("Last logout", logout)])
     elif online and not old["online"]:
+        ping = True
         msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN,
                     [("Mode", where or "?"), ("Since", login)])
     elif not online and (old["online"] or last_in != old.get("lastLogin")):
@@ -87,7 +94,7 @@ def check(name, old, key, overview=False):
 
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out}
-    return state, msg
+    return state, msg, ping
 
 
 def main():
@@ -103,22 +110,33 @@ def main():
     if "name" in saved:  # Stand aus der Version für einen Spieler übernehmen
         players[saved["name"]] = {k: v for k, v in saved.items() if k not in ("name", "checked")}
 
-    embeds, errors = [], 0
+    # Discord user IDs to ping, e.g. "mrkioko=123456789012345678, Knuffiman=..."
+    ids = {}
+    for pair in (os.environ.get("DISCORD_IDS") or "").split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            v = "".join(c for c in v if c.isdigit())
+            if v:
+                ids[k.strip().lower()] = v
+    embeds, pings, errors = [], [], 0
     for name in names:
         old = players.get(name, {})
         try:
-            players[name], msg = check(name, old, key, overview)
+            players[name], msg, ping = check(name, old, key, overview)
         except urllib.error.HTTPError as e:
             print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
             errors += 1
             continue
         if msg:
             embeds.append(msg)
+            # only when the player has just come online - not again while they stay online
+            if ping and ids.get(name.lower()):
+                pings.append(ids[name.lower()])
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
     if embeds:
-        post(webhook, embeds)
+        post(webhook, embeds, pings)
 
     new = {"players": {n: players[n] for n in names if n in players}}
     if new != saved:

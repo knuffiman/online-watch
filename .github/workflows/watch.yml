@@ -30,6 +30,7 @@ jobs:
           HYPIXEL_KEY: ${{ secrets.HYPIXEL_KEY }}
           PLAYERS: ${{ vars.PLAYERS }}
           OVERVIEW: ${{ inputs.overview }}
+          DISCORD_IDS: ${{ vars.DISCORD_IDS }}
         run: python3 watch.py
       - name: Save state
         run: |
