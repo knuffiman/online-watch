@@ -9,10 +9,10 @@
     },
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
-      "online": true,
-      "where": "Skyblock / Dynamic",
+      "online": false,
+      "where": null,
       "lastLogin": 1795379191959,
-      "lastLogout": 1795379132070
+      "lastLogout": 1795387993900
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
