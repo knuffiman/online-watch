@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       overview:
-        description: "Übersicht aller Accounts schicken"
+        description: "Send an overview of all accounts"
         type: boolean
         default: true
 

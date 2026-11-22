@@ -73,17 +73,17 @@ def check(name, old, key, overview=False):
 
     msg = None
     if overview or "online" not in old:
-        msg = embed(shown, uuid, f"📋 {shown}" if overview and "online" in old else f"👀 {shown} wird beobachtet", BLUE,
-                    [("Status", "🟢 online" if online else "⚫ offline"), ("Modus", where if online else None),
-                     ("Letzter Login", login), ("Letzter Logout", logout)])
+        msg = embed(shown, uuid, f"📋 {shown}" if overview and "online" in old else f"👀 Now watching {shown}", BLUE,
+                    [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
+                     ("Last login", login), ("Last logout", logout)])
     elif online and not old["online"]:
-        msg = embed(shown, uuid, f"🟢 {shown} ist online", GREEN,
-                    [("Modus", where or "?"), ("Seit", login)])
+        msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN,
+                    [("Mode", where or "?"), ("Since", login)])
     elif not online and (old["online"] or last_in != old.get("lastLogin")):
-        msg = embed(shown, uuid, f"🔴 {shown} war online", RED,
-                    [("Login", login), ("Logout", logout), ("Gespielt", played)])
+        msg = embed(shown, uuid, f"🔴 {shown} was online", RED,
+                    [("Login", login), ("Logout", logout), ("Played", played)])
     elif online and where and old.get("where") and where != old["where"]:
-        msg = embed(shown, uuid, f"🔁 {shown} spielt jetzt {where}", GREY, [("Online seit", login)])
+        msg = embed(shown, uuid, f"🔁 {shown} is now playing {where}", GREY, [("Online since", login)])
 
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out}
