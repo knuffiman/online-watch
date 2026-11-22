@@ -1,11 +1,11 @@
-"""Prüft in Abständen, wann ein Minecraft-Account zuletzt auf Hypixel online war, und meldet
-Änderungen in Discord. Läuft in GitHub Actions (.github/workflows/watch.yml); der Stand liegt in
-state.json im Repo.
+"""Prüft in Abständen, wann Minecraft-Accounts zuletzt auf Hypixel online waren, und meldet
+Änderungen in Discord (als Embed mit Kopf, Status und Zeiten). Läuft in GitHub Actions
+(.github/workflows/watch.yml); der Stand liegt in state.json im Repo.
 
 Secrets (Repo → Settings → Secrets and variables → Actions):
   DISCORD_WEBHOOK  - Webhook-URL des Discord-Kanals
   HYPIXEL_KEY      - Hypixel-API-Key (developer.hypixel.net)
-Variable (optional): PLAYER - Spielername, Standard Knuffiman
+Variable (optional): PLAYERS - Spielernamen, durch Komma getrennt (Standard siehe DEFAULT)
 """
 import json
 import os
@@ -14,11 +14,11 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
+DEFAULT = "mrkioko, Knuffiman, _gggaming"
 STATE = Path(__file__).resolve().parent / "state.json"
-UA = {"User-Agent": "online-watch/1.0"}
-TZ = ZoneInfo("Europe/Berlin")
+UA = {"User-Agent": "online-watch/1.1"}
+GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
 def get(url, headers=None):
@@ -27,15 +27,17 @@ def get(url, headers=None):
         return json.loads(r.read().decode("utf-8"))
 
 
-def post(webhook, text):
-    body = json.dumps({"content": text, "username": "Online Watch"}).encode("utf-8")
-    req = urllib.request.Request(webhook, data=body, method="POST",
-                                 headers={**UA, "Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=20).close()
+def post(webhook, embeds):
+    for i in range(0, len(embeds), 10):  # Discord: höchstens 10 Embeds pro Nachricht
+        body = json.dumps({"username": "Online Watch", "embeds": embeds[i:i + 10]}).encode("utf-8")
+        req = urllib.request.Request(webhook, data=body, method="POST",
+                                     headers={**UA, "Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=20).close()
 
 
-def clock(ms):
-    return datetime.fromtimestamp(ms / 1000, TZ).strftime("%d.%m. %H:%M")
+def ts(ms, style="f"):
+    """Discord-Zeitstempel: zeigt sich bei jedem in seiner eigenen Zeitzone."""
+    return f"<t:{ms // 1000}:{style}>"
 
 
 def span(ms):
@@ -43,58 +45,85 @@ def span(ms):
     return f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
 
 
-def main():
-    webhook = os.environ.get("DISCORD_WEBHOOK", "")
-    key = os.environ.get("HYPIXEL_KEY", "")
-    name = os.environ.get("PLAYER") or "Knuffiman"
-    if not webhook or not key:
-        print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
-        return 1
-    state = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
-    if state.get("name") != name or not state.get("uuid"):
-        state = {"name": name, "uuid": get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]}
-    uuid = state["uuid"]
+def embed(name, uuid, title, color, fields):
+    return {
+        "title": title,
+        "color": color,
+        "thumbnail": {"url": f"https://mc-heads.net/avatar/{uuid}/64"},
+        "fields": [{"name": k, "value": v, "inline": True} for k, v in fields if v],
+        "footer": {"text": name},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
+
+def check(name, old, key):
+    """Neuer Stand eines Spielers und das Embed dazu (None, wenn sich nichts getan hat)."""
+    uuid = old.get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
     auth = {"API-Key": key}
     session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", auth).get("session") or {}
     player = get(f"https://api.hypixel.net/v2/player?uuid={uuid}", auth).get("player") or {}
     online = bool(session.get("online"))
-    where = " / ".join(x for x in (session.get("gameType"), session.get("mode")) if x)
+    where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     last_in, last_out = player.get("lastLogin"), player.get("lastLogout")
+    shown = player.get("displayname") or name
 
-    first = "online" not in state
+    login = ts(last_in) + " (" + ts(last_in, "R") + ")" if last_in else None
+    logout = ts(last_out) + " (" + ts(last_out, "R") + ")" if last_out else None
+    played = span(last_out - last_in) if last_in and last_out and last_out > last_in else None
+
     msg = None
-    if first:
-        msg = (f"👀 Beobachte **{name}** - gerade {'online' if online else 'offline'}"
-               + (f", zuletzt eingeloggt {clock(last_in)}" if last_in else "")
-               + (f", zuletzt ausgeloggt {clock(last_out)}" if last_out else ""))
-    elif online and not state["online"]:
-        msg = f"🟢 **{name}** ist online" + (f" ({where})" if where else "") + (f" - seit {clock(last_in)}" if last_in else "")
-    elif not online and (state["online"] or last_in != state.get("lastLogin")):
-        msg = f"🔴 **{name}** war online"
-        if last_in:
-            msg += f" - Login {clock(last_in)}"
-        if last_out and last_in and last_out > last_in:
-            msg += f", Logout {clock(last_out)} ({span(last_out - last_in)})"
-        elif last_out:
-            msg += f", zuletzt ausgeloggt {clock(last_out)}"
-    if msg:
-        post(webhook, msg)
-        print("gesendet:", msg)
-    else:
-        print(f"{name}: {'online' if online else 'offline'}, nichts Neues")
-    state.update(online=online, lastLogin=last_in, lastLogout=last_out,
-                 checked=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    # nur bei Änderungen speichern, sonst entsteht bei jedem Lauf ein Commit
-    old = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
-    if {k: v for k, v in old.items() if k != "checked"} != {k: v for k, v in state.items() if k != "checked"}:
-        STATE.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
-    return 0
+    if "online" not in old:
+        msg = embed(shown, uuid, f"👀 {shown} wird beobachtet", BLUE,
+                    [("Status", "🟢 online" if online else "⚫ offline"), ("Modus", where if online else None),
+                     ("Letzter Login", login), ("Letzter Logout", logout)])
+    elif online and not old["online"]:
+        msg = embed(shown, uuid, f"🟢 {shown} ist online", GREEN,
+                    [("Modus", where or "?"), ("Seit", login)])
+    elif not online and (old["online"] or last_in != old.get("lastLogin")):
+        msg = embed(shown, uuid, f"🔴 {shown} war online", RED,
+                    [("Login", login), ("Logout", logout), ("Gespielt", played)])
+    elif online and where and old.get("where") and where != old["where"]:
+        msg = embed(shown, uuid, f"🔁 {shown} spielt jetzt {where}", GREY, [("Online seit", login)])
+
+    state = {"uuid": uuid, "online": online, "where": where if online else None,
+             "lastLogin": last_in, "lastLogout": last_out}
+    return state, msg
+
+
+def main():
+    webhook = os.environ.get("DISCORD_WEBHOOK", "")
+    key = os.environ.get("HYPIXEL_KEY", "")
+    names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
+    if not webhook or not key:
+        print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
+        return 1
+    saved = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+    players = saved.get("players", {})
+    if "name" in saved:  # Stand aus der Version für einen Spieler übernehmen
+        players[saved["name"]] = {k: v for k, v in saved.items() if k not in ("name", "checked")}
+
+    embeds, errors = [], 0
+    for name in names:
+        old = players.get(name, {})
+        try:
+            players[name], msg = check(name, old, key)
+        except urllib.error.HTTPError as e:
+            print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
+            errors += 1
+            continue
+        if msg:
+            embeds.append(msg)
+            print(f"{name}: {msg['title']}")
+        else:
+            print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
+    if embeds:
+        post(webhook, embeds)
+
+    new = {"players": {n: players[n] for n in names if n in players}}
+    if new != saved:
+        STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
+    return 2 if errors == len(names) else 0
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except urllib.error.HTTPError as e:
-        print(f"HTTP {e.code} bei {e.url.split('?')[0]}")
-        sys.exit(2)
+    sys.exit(main())

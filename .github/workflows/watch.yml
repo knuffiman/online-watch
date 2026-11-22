@@ -23,7 +23,7 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HYPIXEL_KEY: ${{ secrets.HYPIXEL_KEY }}
-          PLAYER: ${{ vars.PLAYER }}
+          PLAYERS: ${{ vars.PLAYERS }}
         run: python3 watch.py
       - name: Save state
         run: |
