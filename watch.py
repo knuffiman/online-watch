@@ -18,6 +18,9 @@ from pathlib import Path
 
 DEFAULT = "mrkioko, Knuffiman, _gggaming"
 STATE = Path(__file__).resolve().parent / "state.json"
+# the database: one line per join and per leave, nothing else
+LOG = Path(__file__).resolve().parent / "sessions.csv"
+EVENTS = []
 UA = {"User-Agent": "online-watch/1.1"}
 GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
@@ -97,9 +100,41 @@ def check(name, old, key, overview=False):
     elif online and where and old.get("where") and where != old["where"]:
         msg = embed(shown, uuid, f"🔁 {shown} is now playing {where}", GREY, [("Online since", login)])
 
+    if "online" in old:
+        now = int(time.time() * 1000)
+        was = old["online"]
+        relogged = online and was and last_in and old.get("lastLogin") and last_in != old["lastLogin"]
+        # a whole session between two checks (after an earlier one ended, if they were online)
+        between = not online and last_in and old.get("lastLogin") and last_in != old["lastLogin"]
+        if (not online and was) or relogged or between:
+            if between and was:
+                EVENTS.append((last_in - 1, shown, "leave", "", ""))
+            if between:
+                EVENTS.append((last_in, shown, "join", "", ""))
+            end = last_out if last_out and last_in and last_out >= last_in else now
+            EVENTS.append((end, shown, "leave", "", played or ""))
+        if (online and not was) or relogged:
+            EVENTS.append((last_in or now, shown, "join", where, ""))
+
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out}
     return state, msg, ping
+
+
+def write_log():
+    """Appends the joins and leaves of this run to sessions.csv, oldest first."""
+    if not EVENTS:
+        return
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Berlin")
+    new = not LOG.exists()
+    with LOG.open("a", encoding="utf-8", newline="") as f:
+        if new:
+            f.write("time,player,event,mode,played\n")
+        for ms, name, event, mode, played in sorted(EVENTS):
+            when = datetime.fromtimestamp(ms / 1000, tz).strftime("%Y-%m-%d %H:%M")
+            f.write(f"{when},{name},{event},{mode},{played}\n")
+    EVENTS.clear()
 
 
 def main():
@@ -178,6 +213,7 @@ def main():
         last_quiet = now
     if embeds or joined:
         post(webhook, embeds, joined)
+    write_log()
 
     new = {"players": {n: players[n] for n in names if n in players}}
     if pending:

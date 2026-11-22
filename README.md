@@ -10,3 +10,6 @@ Einrichten (einmal): Repo → Settings → Secrets and variables → Actions →
 
 Optional unter *Variables*: `PLAYERS` mit anderen Spielernamen, durch Komma getrennt.
 Sofort testen: Actions → Online Watch → Run workflow.
+
+**Datenbank:** [`sessions.csv`](sessions.csv) – eine Zeile pro Join und pro Leave
+(Zeit in deutscher Zeit, Spieler, Ereignis, Modus beim Join, Spielzeit beim Leave).
