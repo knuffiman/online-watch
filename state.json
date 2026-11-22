@@ -1,8 +1,25 @@
 {
-  "name": "Knuffiman",
-  "uuid": "898089247cc1490c82daba24b47c8cb1",
-  "online": true,
-  "lastLogin": 1795379191959,
-  "lastLogout": 1795379132070,
-  "checked": "2026-11-22T22:30:58+00:00"
+  "players": {
+    "mrkioko": {
+      "uuid": "2c8d3d5f841540c0987e06d889f1bf02",
+      "online": false,
+      "where": null,
+      "lastLogin": null,
+      "lastLogout": null
+    },
+    "Knuffiman": {
+      "uuid": "898089247cc1490c82daba24b47c8cb1",
+      "online": true,
+      "where": "Skyblock / Dynamic",
+      "lastLogin": 1795379191959,
+      "lastLogout": 1795379132070
+    },
+    "_gggaming": {
+      "uuid": "562fe7f8702045da9182379182dead73",
+      "online": false,
+      "where": null,
+      "lastLogin": 1795376594146,
+      "lastLogout": 1795379307022
+    }
+  }
 }
