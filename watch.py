@@ -56,7 +56,7 @@ def embed(name, uuid, title, color, fields):
     }
 
 
-def check(name, old, key):
+def check(name, old, key, overview=False):
     """Neuer Stand eines Spielers und das Embed dazu (None, wenn sich nichts getan hat)."""
     uuid = old.get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
     auth = {"API-Key": key}
@@ -72,8 +72,8 @@ def check(name, old, key):
     played = span(last_out - last_in) if last_in and last_out and last_out > last_in else None
 
     msg = None
-    if "online" not in old:
-        msg = embed(shown, uuid, f"👀 {shown} wird beobachtet", BLUE,
+    if overview or "online" not in old:
+        msg = embed(shown, uuid, f"📋 {shown}" if overview and "online" in old else f"👀 {shown} wird beobachtet", BLUE,
                     [("Status", "🟢 online" if online else "⚫ offline"), ("Modus", where if online else None),
                      ("Letzter Login", login), ("Letzter Logout", logout)])
     elif online and not old["online"]:
@@ -93,6 +93,7 @@ def check(name, old, key):
 def main():
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
+    overview = os.environ.get("OVERVIEW", "").lower() == "true"
     names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
     if not webhook or not key:
         print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
@@ -106,7 +107,7 @@ def main():
     for name in names:
         old = players.get(name, {})
         try:
-            players[name], msg = check(name, old, key)
+            players[name], msg = check(name, old, key, overview)
         except urllib.error.HTTPError as e:
             print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
             errors += 1
