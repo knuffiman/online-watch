@@ -27,17 +27,21 @@ def get(url, headers=None):
         return json.loads(r.read().decode("utf-8"))
 
 
-def post(webhook, embeds, pings=()):
-    """Embeds don't ping; the mentions go into the message text, once, with the first batch."""
-    for i in range(0, len(embeds), 10):  # Discord: höchstens 10 Embeds pro Nachricht
-        payload = {"username": "Online Watch", "embeds": embeds[i:i + 10],
-                   "allowed_mentions": {"parse": [], "users": list(pings) if i == 0 else []}}
-        if pings and i == 0:
-            payload["content"] = " ".join(f"<@{p}>" for p in pings) + " joined Hypixel!"
-        body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(webhook, data=body, method="POST",
-                                     headers={**UA, "Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=20).close()
+def send(webhook, payload):
+    payload = {"username": "Online Watch", "allowed_mentions": {"parse": []}, **payload}
+    req = urllib.request.Request(webhook, data=json.dumps(payload).encode("utf-8"), method="POST",
+                                 headers={**UA, "Content-Type": "application/json"})
+    urllib.request.urlopen(req, timeout=20).close()
+
+
+def post(webhook, embeds, joined=()):
+    """The cards first (at most 10 per message); a join card goes on its own, followed by a
+    message with nothing but the player's ping right under it - embeds themselves never ping."""
+    for i in range(0, len(embeds), 10):
+        send(webhook, {"embeds": embeds[i:i + 10]})
+    for card, uid in joined:
+        send(webhook, {"embeds": [card]})
+        send(webhook, {"content": f"<@{uid}>", "allowed_mentions": {"parse": [], "users": [uid]}})
 
 
 def ts(ms, style="f"):
@@ -124,11 +128,11 @@ def main():
         if not uid:
             print(f"TEST_PING: no Discord ID for {test}")
             return 1
-        post(webhook, [{"title": f"🧪 Test ping for {test}", "color": BLUE,
-                        "description": "This is how a join ping looks. Nothing else changed."}], [uid])
+        post(webhook, [], [({"title": f"🧪 Test ping for {test}", "color": BLUE,
+                             "description": "This is how a join ping looks. Nothing else changed."}, uid)])
         print(f"test ping sent to {test}")
         return 0
-    embeds, pings, errors = [], [], 0
+    embeds, joined, errors = [], [], 0
     for name in names:
         old = players.get(name, {})
         try:
@@ -138,15 +142,16 @@ def main():
             errors += 1
             continue
         if msg:
-            embeds.append(msg)
             # only when the player has just come online - not again while they stay online
             if ping and ids.get(name.lower()):
-                pings.append(ids[name.lower()])
+                joined.append((msg, ids[name.lower()]))
+            else:
+                embeds.append(msg)
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
-    if embeds:
-        post(webhook, embeds, pings)
+    if embeds or joined:
+        post(webhook, embeds, joined)
 
     new = {"players": {n: players[n] for n in names if n in players}}
     if new != saved:
