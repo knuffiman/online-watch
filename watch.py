@@ -45,15 +45,24 @@ def send(webhook, payload, method="POST", url=None):
     return json.loads(body) if body else None
 
 
-def live(webhook, msg_id):
-    """The pinned live message: edited in place every round, so it always shows the current state.
-    If it is gone (deleted), a new one is sent; its id is kept in state.json."""
+def live(webhook, msg_id, bottom=False):
+    """The live message, always the last one in the channel: edited in place every round; when
+    other cards were sent (bottom), the old one is deleted and a new one sent below them.
+    If it is gone (deleted by hand), a new one is sent; its id is kept in state.json."""
     if not LIVE:
         return msg_id
     now = int(time.time())
-    payload = {"content": f"📌 **Live status** – updated every minute (last: <t:{now}:T>, <t:{now}:R>)",
+    payload = {"content": f"📡 **Live status** – updated every minute (last: <t:{now}:T>, <t:{now}:R>)",
                "embeds": list(LIVE.values())[:10]}
     base = webhook.split("?")[0]
+    if msg_id and bottom:
+        try:
+            req = urllib.request.Request(f"{base}/messages/{msg_id}", method="DELETE", headers=UA)
+            urllib.request.urlopen(req, timeout=20).close()
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                print(f"could not delete the old live message: HTTP {e.code}")
+        msg_id = None
     if msg_id:
         try:
             send(webhook, payload, "PATCH", f"{base}/messages/{msg_id}")
@@ -64,7 +73,7 @@ def live(webhook, msg_id):
             print("live message gone, sending a new one")
     sep = "&" if "?" in webhook else "?"
     msg = send(webhook, payload, url=f"{webhook}{sep}wait=true")
-    print(f"live message sent: {msg['id']} - pin it in Discord")
+    print(f"live message sent: {msg['id']}")
     return msg["id"]
 
 
@@ -339,7 +348,8 @@ def main():
         embeds += [pending[n] for n in names if n in pending]
         pending = {}
         last_quiet = now
-    if embeds or joined:
+    moved = bool(embeds or joined)  # new cards: the live message goes below them again
+    if moved:
         post(webhook, embeds, joined)
     write_log()
     live_id = saved.get("live")
@@ -348,7 +358,7 @@ def main():
         LIVE.clear()
         LIVE.update(order)
         try:
-            live_id = live(webhook, live_id)
+            live_id = live(webhook, live_id, moved)
         except Exception as e:
             print(f"live message failed: {e!r}")
     LIVE.clear()
