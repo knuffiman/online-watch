@@ -139,6 +139,18 @@ def check(name, old, key, overview=False):
     online = bool(session.get("online"))
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     last_in, last_out = player.get("lastLogin"), player.get("lastLogout")
+    # Switching lobbies or servers can show a player offline for a moment. Only a new logout
+    # time, or being offline 3 rounds in a row (when the API hides the times), counts as leaving;
+    # until then they stay online - no leave card, and no second join ping afterwards.
+    miss = 0
+    if not online and old.get("online") and not overview:
+        miss = old.get("miss", 0) + 1
+        new_logout = last_out and last_out != old.get("lastLogout") and (not last_in or last_out >= last_in)
+        if not new_logout and miss < 3:
+            online, where = True, old.get("where") or ""
+            print(f"{name}: offline for a moment ({miss}/3), still counted as online")
+        else:
+            miss = 0
     shown = player.get("displayname") or name
 
     login = ts(last_in) + " (" + ts(last_in, "R") + ")" if last_in else None
@@ -158,7 +170,8 @@ def check(name, old, key, overview=False):
                     [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
                      ("Last login", login), ("Last logout", logout)])
     elif online and not old["online"]:
-        ping = True
+        # a ping once per login: not again for the same session (last login unchanged)
+        ping = not (last_in and last_in == old.get("pinged"))
         msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN,
                     [("Mode", where or "?"), ("Since", login)])
     elif not online and (old["online"] or last_in != old.get("lastLogin")):
@@ -199,7 +212,9 @@ def check(name, old, key, overview=False):
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2}
+             "v": 2, "pinged": last_in if ping else old.get("pinged")}
+    if miss:
+        state["miss"] = miss
     return state, msg, ping
 
 
