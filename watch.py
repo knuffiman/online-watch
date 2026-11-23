@@ -118,6 +118,34 @@ def playtime(old, online, last_in, last_out, now, shown):
     return total, counted
 
 
+# Hypixel only gives the game, mode and map, no server number; Skyblock modes get readable names
+SKYBLOCK = {"dynamic": "Private Island", "hub": "Hub", "farming_1": "The Barn", "garden": "Garden",
+            "foraging_1": "The Park", "foraging_2": "Galatea", "mining_1": "Gold Mine",
+            "mining_2": "Deep Caverns", "mining_3": "Dwarven Mines", "crystal_hollows": "Crystal Hollows",
+            "mineshaft": "Glacite Mineshaft", "combat_1": "Spider's Den", "combat_3": "The End",
+            "crimson_isle": "Crimson Isle", "fishing_1": "Backwater Bayou", "dungeon_hub": "Dungeon Hub",
+            "dungeon": "Dungeons", "kuudra": "Kuudra", "rift": "The Rift", "winter": "Jerry's Workshop",
+            "dark_auction": "Dark Auction"}
+
+
+def server(session):
+    """The server a player is on, as far as the API says: game, area and map."""
+    game, mode, where_map = session.get("gameType"), session.get("mode"), session.get("map")
+    if not game:
+        return None
+    parts = [game.replace("_", " ").title()]
+    if mode:
+        if game == "SKYBLOCK":
+            parts.append(SKYBLOCK.get(mode.lower(), mode.replace("_", " ").title()))
+        elif mode.upper() == "LOBBY":
+            parts.append("Lobby")
+        else:
+            parts.append(mode.replace("_", " ").title())
+    if where_map and where_map not in parts:
+        parts.append(where_map)
+    return " – ".join(parts)
+
+
 def embed(name, uuid, title, color, fields):
     return {
         "title": title,
@@ -152,6 +180,7 @@ def check(name, old, key, overview=False):
         else:
             miss = 0
     shown = player.get("displayname") or name
+    on = server(session) or old.get("server") if online else None  # kept during a lobby switch
 
     login = ts(last_in) + " (" + ts(last_in, "R") + ")" if last_in else None
     logout = ts(last_out) + " (" + ts(last_out, "R") + ")" if last_out else None
@@ -198,7 +227,7 @@ def check(name, old, key, overview=False):
 
     status = embed(shown, uuid, f"🟢 {shown} is online" if online else f"🔴 {shown} is offline",
                    GREEN if online else RED,
-                   [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
+                   [("Status", "🟢 online" if online else "⚫ offline"), ("Server", on),
                     ("Last login", login), ("Last logout", logout)])
     total, counted = playtime(old, online, last_in, last_out, pulled, shown)
     # the live card: the total including the session going on right now
@@ -212,7 +241,7 @@ def check(name, old, key, overview=False):
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2, "pinged": last_in if ping else old.get("pinged")}
+             "v": 2, "server": on, "pinged": last_in if ping else old.get("pinged")}
     if miss:
         state["miss"] = miss
     return state, msg, ping
