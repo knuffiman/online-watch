@@ -155,6 +155,41 @@ def server(session):
     return " – ".join(parts)
 
 
+def coins(n):
+    n = float(n or 0)
+    for size, unit in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "k")):
+        if abs(n) >= size:
+            v = n / size
+            return f"{v:.2f}".rstrip("0").rstrip(".") + unit if v < 100 else f"{v:.0f}{unit}"
+    return f"{n:.0f}"
+
+
+def networth(uuids):
+    """Skyblock networth via networth.js (SkyHelper-Networth): {uuid: result}, {} if it fails."""
+    try:
+        r = subprocess.run(["node", str(STATE.parent / "networth.js"), *uuids], capture_output=True,
+                           text=True, timeout=180, cwd=STATE.parent)
+        return json.loads(r.stdout or "{}")
+    except Exception as e:
+        print(f"networth failed: {e!r}")
+        return {}
+
+
+def nw_text(nw):
+    """The short networth summary on the live card."""
+    if not nw:
+        return None
+    if nw.get("error"):
+        return "n/a"
+    text = f"**{coins(nw.get('networth'))}**" + (f" · {nw['profile']}" if nw.get("profile") else "")
+    text += f"\nPurse {coins(nw.get('purse'))} · Bank {coins(nw.get('bank'))}"
+    if nw.get("noInventory"):
+        text += "\n⚠️ inventory API off"
+    elif nw.get("top"):
+        text += f"\nTop: {nw['top'][0].replace('_', ' ').title()} {coins(nw['top'][1])}"
+    return text
+
+
 def embed(name, uuid, title, color, fields):
     return {
         "title": title,
@@ -237,7 +272,7 @@ def check(name, old, key, overview=False):
     status = embed(shown, uuid, f"🟢 {shown} is online" if online else f"🔴 {shown} is offline",
                    GREEN if online else RED,
                    [("Status", "🟢 online" if online else "⚫ offline"), ("Server", on),
-                    ("Last login", login), ("Last logout", logout)])
+                    ("Last login", login), ("Last logout", logout), ("Networth", nw_text(old.get("nw")))])
     total, counted = playtime(old, online, last_in, last_out, pulled, shown)
     # the live card: the total including the session going on right now
     running = pulled - last_in if online and last_in and last_in != counted else 0
@@ -250,7 +285,7 @@ def check(name, old, key, overview=False):
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2, "server": on, "pinged": last_in if ping else old.get("pinged")}
+             "v": 2, "server": on, "nw": old.get("nw"), "pinged": last_in if ping else old.get("pinged")}
     if miss:
         state["miss"] = miss
     return state, msg, ping
@@ -323,6 +358,18 @@ def main():
     pending = dict(saved.get("pending", {}))
     last_quiet = saved.get("lastQuiet", 0)
     now = int(time.time())
+    # networth every 15 minutes (only the watching run), kept in state.json
+    nw_at = saved.get("nwAt", 0)
+    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 900:
+        uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
+        result = networth(list(uuids)) if uuids else {}
+        for uuid, n in uuids.items():
+            if uuid in result:
+                players[n]["nw"] = result[uuid]
+                if result[uuid].get("error"):
+                    print(f"{n}: networth: {result[uuid]['error']}")
+        if result:
+            nw_at = now
     for name in names:
         old = players.get(name, {})
         try:
@@ -372,6 +419,8 @@ def main():
         new["lastQuiet"] = last_quiet
     if live_id:
         new["live"] = live_id
+    if nw_at:
+        new["nwAt"] = nw_at
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     return 2 if errors == len(names) else 0

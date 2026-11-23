@@ -37,6 +37,9 @@ jobs:
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v5
+      - name: Install networth calculator
+        # SkyHelper-Networth, exact version from package-lock.json; the bot runs without it if this fails
+        run: npm ci --ignore-scripts --no-audit --no-fund || true
       - name: Check
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
