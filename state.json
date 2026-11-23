@@ -11,7 +11,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 17714 s, retry-after 17714; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -212,7 +212,7 @@
         ]
       ],
       "pinged": null,
-      "nwAt": 1795451503
+      "nwAt": 1795455343
     },
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
@@ -225,7 +225,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 17714 s, retry-after 17714; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -426,7 +426,7 @@
         ]
       ],
       "pinged": null,
-      "nwAt": 1795451503
+      "nwAt": 1795455343
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
@@ -439,7 +439,7 @@
       "v": 2,
       "server": "Skyblock \u2013 Private Island",
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 17714 s, retry-after 17714; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -613,12 +613,13 @@
       ],
       "pinged": 1795425458178,
       "ratAt": 1795440307,
-      "nwAt": 1795451503
+      "nwAt": 1795455343
     }
   },
   "req": {
-    "498736": 7
+    "498736": 7,
+    "498737": 6
   },
   "live": "1574415523708666009",
-  "nwAt": 1795451503
+  "nwAt": 1795455343
 }
