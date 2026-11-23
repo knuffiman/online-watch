@@ -12,21 +12,21 @@
       "server": null,
       "nw": {
         "profile": "Tomato",
-        "networth": 4473911231.962877,
+        "networth": 4474649829.962877,
         "purse": 3699868.0723750144,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "accessories",
-          1125257413.087758
+          1125760414.087758
         ],
         "types": {
-          "accessories": 1125257413,
-          "pets": 1045432516,
+          "accessories": 1125760414,
+          "pets": 1045436540,
           "wardrobe": 409815974,
-          "enderchest": 385615697,
+          "enderchest": 385812246,
           "inventory": 137837771,
-          "museum": 118251515,
+          "museum": 118286539,
           "equipment": 112808240,
           "storage": 69500000,
           "sacks_bag": 25533524,
@@ -155,6 +155,62 @@
             "carnival_mask_inventory": 0
           },
           4473911231.962877
+        ],
+        [
+          1795437307,
+          3473680389.711725,
+          "Tomato",
+          {
+            "accessories": 1125760414,
+            "pets": 1045436540,
+            "wardrobe": 409815974,
+            "enderchest": 385812246,
+            "inventory": 137837771,
+            "museum": 118286539,
+            "equipment": 112808240,
+            "storage": 69500000,
+            "sacks_bag": 25533524,
+            "hunting_toolkit": 23987516,
+            "sacks": 10348433,
+            "farming_toolkit": 4801974,
+            "essence": 34648,
+            "quiver": 16701,
+            "armor": 0,
+            "personal_vault": 0,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0,
+            "carnival_mask_inventory": 0
+          },
+          4474649829.962877
+        ],
+        [
+          1795437607,
+          3473680389.711725,
+          "Tomato",
+          {
+            "accessories": 1125760414,
+            "pets": 1045436540,
+            "wardrobe": 409815974,
+            "enderchest": 385812246,
+            "inventory": 137837771,
+            "museum": 118286539,
+            "equipment": 112808240,
+            "storage": 69500000,
+            "sacks_bag": 25533524,
+            "hunting_toolkit": 23987516,
+            "sacks": 10348433,
+            "farming_toolkit": 4801974,
+            "essence": 34648,
+            "quiver": 16701,
+            "armor": 0,
+            "personal_vault": 0,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0,
+            "carnival_mask_inventory": 0
+          },
+          4474649829.962877
         ]
       ],
       "pinged": null
@@ -171,28 +227,28 @@
       "server": null,
       "nw": {
         "profile": "Tomato",
-        "networth": 46544407660.82074,
+        "networth": 46547915463.22075,
         "purse": 3130648910.0660043,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "wardrobe",
-          10520063041.997036
+          10520238005.997036
         ],
         "types": {
-          "wardrobe": 10520063042,
-          "storage": 8849401832,
-          "accessories": 7492897617,
-          "inventory": 5737787080,
-          "pets": 4685738078,
-          "equipment": 2353639631,
+          "wardrobe": 10520238006,
+          "storage": 8848135949,
+          "accessories": 7492729618,
+          "inventory": 5737792634,
+          "pets": 4685735078,
+          "equipment": 2358662128,
           "sacks": 1223046276,
-          "enderchest": 749449077,
-          "museum": 423262840,
+          "enderchest": 749360177,
+          "museum": 423121411,
           "essence": 199647584,
           "sacks_bag": 110900122,
           "hunting_toolkit": 64533998,
-          "armor": 2378000,
+          "armor": 2349999,
           "quiver": 44133,
           "personal_vault": 0,
           "fishing_bag": 0,
@@ -314,6 +370,62 @@
             "farming_toolkit": 0
           },
           46544407660.82074
+        ],
+        [
+          1795437307,
+          45546946022.9696,
+          "Tomato",
+          {
+            "wardrobe": 10520238006,
+            "storage": 8848135949,
+            "accessories": 7492729618,
+            "inventory": 5737792634,
+            "pets": 4685735078,
+            "equipment": 2358662128,
+            "sacks": 1223046276,
+            "enderchest": 749360177,
+            "museum": 423121411,
+            "essence": 199647584,
+            "sacks_bag": 110900122,
+            "hunting_toolkit": 64533998,
+            "armor": 2349999,
+            "quiver": 44133,
+            "personal_vault": 0,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0,
+            "carnival_mask_inventory": 0,
+            "farming_toolkit": 0
+          },
+          46547915463.22075
+        ],
+        [
+          1795437607,
+          45546946022.9696,
+          "Tomato",
+          {
+            "wardrobe": 10520238006,
+            "storage": 8848135949,
+            "accessories": 7492729618,
+            "inventory": 5737792634,
+            "pets": 4685735078,
+            "equipment": 2358662128,
+            "sacks": 1223046276,
+            "enderchest": 749360177,
+            "museum": 423121411,
+            "essence": 199647584,
+            "sacks_bag": 110900122,
+            "hunting_toolkit": 64533998,
+            "armor": 2349999,
+            "quiver": 44133,
+            "personal_vault": 0,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0,
+            "carnival_mask_inventory": 0,
+            "farming_toolkit": 0
+          },
+          46547915463.22075
         ]
       ],
       "pinged": null
@@ -330,30 +442,30 @@
       "server": "Skyblock \u2013 Private Island",
       "nw": {
         "profile": "Tomato",
-        "networth": 31945185367.934097,
-        "purse": 262064.04100000113,
+        "networth": 31943034705.28345,
+        "purse": 262124.04100000113,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "accessories",
-          9907035816.21415
+          9906867817.21415
         ],
         "types": {
-          "accessories": 9907035816,
-          "storage": 6581587856,
-          "pets": 4058797754,
-          "inventory": 3112377855,
-          "equipment": 1323954959,
+          "accessories": 9906867817,
+          "storage": 6580381871,
+          "pets": 4058283958,
+          "inventory": 3112374403,
+          "equipment": 1324154959,
           "armor": 1248866258,
           "sacks": 1239766766,
           "essence": 859959569,
-          "enderchest": 767437334,
-          "wardrobe": 737121045,
-          "museum": 453970619,
+          "enderchest": 767357335,
+          "wardrobe": 737191050,
+          "museum": 453511623,
           "farming_toolkit": 65056978,
           "sacks_bag": 39088826,
           "carnival_mask_inventory": 39000000,
-          "personal_vault": 18014884,
+          "personal_vault": 18024383,
           "hunting_toolkit": 900000,
           "quiver": 13742,
           "fishing_bag": 0,
@@ -473,11 +585,67 @@
             "candy_inventory": 0
           },
           31945185367.934097
+        ],
+        [
+          1795437307,
+          30942065235.0323,
+          "Tomato",
+          {
+            "accessories": 9906867817,
+            "storage": 6580381871,
+            "pets": 4058283958,
+            "inventory": 3112374403,
+            "equipment": 1324154959,
+            "armor": 1248866258,
+            "sacks": 1239766766,
+            "essence": 859959569,
+            "enderchest": 767357335,
+            "wardrobe": 737191050,
+            "museum": 453511623,
+            "farming_toolkit": 65056978,
+            "sacks_bag": 39088826,
+            "carnival_mask_inventory": 39000000,
+            "personal_vault": 18024383,
+            "hunting_toolkit": 900000,
+            "quiver": 13742,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0
+          },
+          31943034675.28345
+        ],
+        [
+          1795437607,
+          30942065265.0323,
+          "Tomato",
+          {
+            "accessories": 9906867817,
+            "storage": 6580381871,
+            "pets": 4058283958,
+            "inventory": 3112374403,
+            "equipment": 1324154959,
+            "armor": 1248866258,
+            "sacks": 1239766766,
+            "essence": 859959569,
+            "enderchest": 767357335,
+            "wardrobe": 737191050,
+            "museum": 453511623,
+            "farming_toolkit": 65056978,
+            "sacks_bag": 39088826,
+            "carnival_mask_inventory": 39000000,
+            "personal_vault": 18024383,
+            "hunting_toolkit": 900000,
+            "quiver": 13742,
+            "fishing_bag": 0,
+            "potion_bag": 0,
+            "candy_inventory": 0
+          },
+          31943034705.28345
         ]
       ],
       "pinged": 1795425458178
     }
   },
-  "live": "1574396547016163342",
-  "nwAt": 1795436986
+  "live": "1574401917734355027",
+  "nwAt": 1795437607
 }
