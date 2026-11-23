@@ -1,9 +1,12 @@
 name: Online Watch
 
+# GitHub drops most scheduled runs (yesterday: one run in 13 hours instead of every 5 minutes).
+# So a run keeps checking by itself every minute for almost 6 hours and then starts the next one.
+# The hourly schedule only restarts that chain if it ever breaks.
+
 on:
   schedule:
-    # every 5 minutes, the shortest GitHub allows (scheduled runs often start a few minutes late)
-    - cron: "*/5 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       overview:
@@ -14,18 +17,24 @@ on:
         description: "Only send test pings: a player, several (comma) or all"
         type: string
         default: ""
+      loop:
+        description: "Keep watching (started by the watch itself, leave off)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
-  group: watch
+  # one watching run at a time (the next one waits); manual overviews and test pings never wait
+  group: ${{ (github.event_name == 'schedule' || inputs.loop) && 'watch' || format('manual-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v5
       - name: Check
@@ -33,16 +42,10 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HYPIXEL_KEY: ${{ secrets.HYPIXEL_KEY }}
           PLAYERS: ${{ vars.PLAYERS }}
-          OVERVIEW: ${{ inputs.overview }}
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
+          OVERVIEW: ${{ inputs.overview }}
           TEST_PING: ${{ inputs.test_ping }}
-        run: python3 watch.py
-      - name: Save state
-        run: |
-          if [ -n "$(git status --porcelain state.json sessions.csv)" ]; then
-            git config user.name "online-watch"
-            git config user.email "online-watch@users.noreply.github.com"
-            git add $(ls state.json sessions.csv 2>/dev/null)
-            git commit -m "state"
-            git push
-          fi
+          # manual runs only report; the watching run is the only one that saves the state
+          LOOP: ${{ github.event_name == 'schedule' || inputs.loop }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 -u watch.py

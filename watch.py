@@ -9,6 +9,7 @@ Variable (optional): PLAYERS - Spielernamen, durch Komma getrennt (Standard sieh
 """
 import json
 import os
+import subprocess
 import sys
 import time
 import urllib.error
@@ -138,6 +139,7 @@ def write_log():
 
 
 def main():
+    EVENTS.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
     overview = os.environ.get("OVERVIEW", "").lower() == "true"
@@ -225,5 +227,77 @@ def main():
     return 2 if errors == len(names) else 0
 
 
+def git(*args):
+    return subprocess.run(["git", *args], cwd=STATE.parent, capture_output=True, text=True)
+
+
+def blobs():
+    """Ids of the code files at HEAD: when they change, the loop restarts with the new code."""
+    return git("rev-parse", "HEAD:watch.py", "HEAD:.github/workflows/watch.yml").stdout
+
+
+def save():
+    """Commits and pushes state.json / sessions.csv when they changed."""
+    if not git("status", "--porcelain", "state.json", "sessions.csv").stdout.strip():
+        return
+    git("add", *[f for f in ("state.json", "sessions.csv") if (STATE.parent / f).exists()])
+    git("-c", "user.name=online-watch", "-c", "user.email=online-watch@users.noreply.github.com",
+        "commit", "-q", "-m", "state")
+    for attempt in range(4):
+        if git("pull", "-q", "--rebase").returncode != 0:
+            git("rebase", "--abort")
+        if git("push", "-q").returncode == 0:
+            return
+        time.sleep(5 * (attempt + 1))
+    print("push failed, trying again with the next change")
+
+
+def dispatch():
+    """Starts the next loop run; it waits in the concurrency queue until this one has ended."""
+    repo, token = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_TOKEN")
+    if not repo or not token:
+        return
+    api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    body = {"ref": os.environ.get("GITHUB_REF_NAME", "main"), "inputs": {"loop": "true", "overview": "false"}}
+    req = urllib.request.Request(f"{api}/repos/{repo}/actions/workflows/watch.yml/dispatches",
+                                 data=json.dumps(body).encode(), method="POST",
+                                 headers={**UA, "Authorization": f"Bearer {token}",
+                                          "Accept": "application/vnd.github+json"})
+    for attempt in range(4):
+        try:
+            urllib.request.urlopen(req, timeout=20).close()
+            print("next run started")
+            return
+        except Exception as e:  # the hourly schedule restarts it if this keeps failing
+            print(f"dispatch failed: {e}")
+            time.sleep(10 * (attempt + 1))
+
+
+def loop(minutes, every):
+    """GitHub drops most scheduled runs, so one run keeps checking by itself for almost the
+    6 hours a job may take, then starts the next run."""
+    end = time.time() + minutes * 60
+    code, synced = blobs(), time.time()
+    while time.time() < end:
+        start = time.time()
+        try:
+            if main() == 1:
+                return 1  # secrets missing: no point in going on
+        except Exception as e:  # network trouble etc.: try again next round
+            print(f"check failed: {e!r}")
+        save()
+        if time.time() - synced >= 600:  # new code pushed? restart with it
+            synced = time.time()
+            git("pull", "-q", "--rebase")
+            if blobs() != code:
+                print("code changed, restarting")
+                break
+        time.sleep(max(1, every - (time.time() - start)))
+    dispatch()
+    return 0
+
+
 if __name__ == "__main__":
+    if os.environ.get("LOOP", "").lower() == "true":
+        sys.exit(loop(int(os.environ.get("LOOP_MINUTES") or 345), int(os.environ.get("EVERY") or 60)))
     sys.exit(main())
