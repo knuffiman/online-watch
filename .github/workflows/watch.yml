@@ -17,6 +17,10 @@ on:
         description: "Only send test pings: a player, several (comma) or all"
         type: string
         default: ""
+      test_rat:
+        description: "Only send a test RAT alarm for this player"
+        type: string
+        default: ""
       loop:
         description: "Keep watching (started by the watch itself, leave off)"
         type: boolean
@@ -48,6 +52,7 @@ jobs:
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
           OVERVIEW: ${{ inputs.overview }}
           TEST_PING: ${{ inputs.test_ping }}
+          TEST_RAT: ${{ inputs.test_rat }}
           # manual runs only report; the watching run is the only one that saves the state
           LOOP: ${{ github.event_name == 'schedule' || inputs.loop }}
           GITHUB_TOKEN: ${{ github.token }}

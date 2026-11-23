@@ -371,6 +371,36 @@ def main():
             v = "".join(c for c in v if c.isdigit())
             if v:
                 ids[k.strip().lower()] = v
+    rat_test = (os.environ.get("TEST_RAT") or "").strip()
+    if rat_test:
+        # a RAT alarm with the real networth, as if the two biggest categories had just been
+        # stolen 10 minutes ago; marked as a test, the saved state is left alone
+        name = next((n for n in names if n.lower() == rat_test.lower()), rat_test)
+        uuid = players.get(name, {}).get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
+        nw = networth([uuid]).get(uuid) or {}
+        if nw.get("error") or nw.get("networth") is None:
+            print(f"TEST_RAT: no networth for {name}: {nw.get('error')}")
+            return 1
+        now = int(time.time())
+        types = dict(nw.get("types") or {})
+        gone = sorted(types, key=lambda k: -types[k])[:2]
+        stolen = {**nw, "types": {k: (0 if k in gone else v) for k, v in types.items()},
+                  "networth": nw["networth"] - sum(types[k] for k in gone)}
+        before = [now - 600, nw["networth"] - (nw.get("bank") or 0), nw.get("profile"), types, nw["networth"]]
+        card = rat_check(name, uuid, {"nw": stolen, "nwHist": [before]}, now)
+        if not card:
+            print(f"TEST_RAT: the test drop is below the alarm limits for {name}")
+            return 1
+        card["title"] = "🧪 TEST – " + card["title"]
+        card["footer"] = {"text": f"{name} • test, nothing was lost"}
+        uid = ids.get(name.lower())
+        send(webhook, {"content": "🧪 **TEST** – 🚨🚨🚨 **RAT ALARM** 🚨🚨🚨", "embeds": [card]})
+        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
+            if uid:
+                send(webhook, {"content": f"🚨 <@{uid}> RAT ALARM – check your account now! (test)",
+                               "allowed_mentions": {"parse": [], "users": [uid]}})
+        print(f"TEST_RAT sent for {name}" + ("" if uid else " (no Discord ID, no pings)"))
+        return 0
     test = (os.environ.get("TEST_PING") or "").strip()
     if test:
         # "all" or names separated by commas: the real card with live data for each, as if the
