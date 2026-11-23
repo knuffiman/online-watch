@@ -3,18 +3,19 @@
     "mrkioko": {
       "uuid": "2c8d3d5f841540c0987e06d889f1bf02",
       "shown": "mrkioko",
-      "online": true,
-      "where": "Skyblock / Hub",
-      "server": "Skyblock \u2013 Hub",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795467853962,
-      "lastLogout": 1795467253944,
-      "total": 60000,
-      "counted": 1795467193944,
+      "lastLogout": 1795467921600,
+      "total": 127638,
+      "counted": 1795467853962,
       "v": 2,
       "pinged": 1795467853962,
-      "statusAt": 1795467853962,
-      "hbFail": 1795467193944,
-      "hbLast": 1795467843479
+      "statusAt": 1795467973971,
+      "hbLeave": 1795467921600,
+      "hbLast": 1795467843479,
+      "hbFail": 1795467193944
     },
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
@@ -28,7 +29,7 @@
       "counted": 1795465744405,
       "v": 2,
       "pinged": 1795467014026,
-      "statusAt": 1795467854313,
+      "statusAt": 1795467974242,
       "hbLast": 1795466963334,
       "hbFail": 1795463944421
     },
@@ -226,7 +227,7 @@
     "498738": 7,
     "498739": 171,
     "498740": 183,
-    "498741": 15
+    "498741": 21
   },
-  "live": "1574531048539291827"
+  "live": "1574531550815453247"
 }
