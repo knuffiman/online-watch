@@ -11,7 +11,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -224,7 +224,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -437,7 +437,7 @@
       "v": 2,
       "server": "Skyblock \u2013 Private Island",
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -614,5 +614,5 @@
     }
   },
   "live": "1574415523708666009",
-  "nwAt": 1795450226
+  "nwAt": 1795450888
 }
