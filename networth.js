@@ -6,7 +6,15 @@ async function hypixel(path) {
     const r = await fetch(`https://api.hypixel.net/v2/${path}`, {
         headers: { 'API-Key': process.env.HYPIXEL_KEY || '', 'User-Agent': 'online-watch/1.1' },
     });
-    if (!r.ok) throw new Error(`HTTP ${r.status} for ${path.split('?')[0]}`);
+    if (!r.ok) {
+        let why = '';
+        if (r.status === 429) {
+            const h = (k) => r.headers.get(k);
+            why = ` (limit ${h('ratelimit-limit')}, left ${h('ratelimit-remaining')}, reset ${h('ratelimit-reset')} s, `
+                + `retry-after ${h('retry-after')}; ${(await r.text()).slice(0, 150)})`;
+        }
+        throw new Error(`HTTP ${r.status} for ${path.split('?')[0]}${why}`);
+    }
     return r.json();
 }
 
