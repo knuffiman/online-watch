@@ -354,9 +354,9 @@ def main():
     embeds, joined, errors = [], [], 0
     # only joins and leaves send a message
     now = int(time.time())
-    # networth every 15 minutes (only the watching run), kept in state.json
+    # networth every 5 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
-    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 900:
+    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290:
         uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
         result = networth(list(uuids)) if uuids else {}
         for uuid, n in uuids.items():
