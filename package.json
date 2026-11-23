@@ -1,0 +1,8 @@
+{
+  "name": "online-watch",
+  "private": true,
+  "description": "Skyblock networth for the live card (networth.js)",
+  "dependencies": {
+    "skyhelper-networth": "2.11.1"
+  }
+}
