@@ -19,6 +19,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
@@ -83,7 +84,11 @@ public class OnlineWatch implements ClientModInitializer {
 		}
 		// JOIN fires once per connection to a server: Hypixel lobby switches stay on the same one
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
+		// the leave code as early as possible, on whichever comes first: leaving the server,
+		// the game closing, or Java shutting down (the others then find nothing left to send)
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onLeave());
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> onLeave());
+		Runtime.getRuntime().addShutdownHook(new Thread(this::onLeave, "onlinewatch-leave"));
 		LOG.info("Online Watch ready for {} account(s)", accounts.size());
 	}
 
@@ -106,16 +111,20 @@ public class OnlineWatch implements ClientModInitializer {
 	}
 
 	private void onLeave() {
-		String name = current;
-		if (name == null) {
-			return; // not on Hypixel with a watched account
+		String name;
+		String body;
+		synchronized (this) { // once per session, whichever hook comes first
+			name = current;
+			if (name == null) {
+				return; // not on Hypixel with a watched account, or already sent
+			}
+			current = null;
+			body = "{\"join\":" + joinCode + ",\"leave\":" + code(name, currentId, "leave") + "}";
 		}
-		current = null;
-		String body = "{\"join\":" + joinCode + ",\"leave\":" + code(name, currentId, "leave") + "}";
 		// right away and waiting for it (at most a few seconds): when the game is being closed,
 		// an async request would die with it
 		try {
-			HttpResponse<Void> res = HTTP.send(request(name, body, 5), HttpResponse.BodyHandlers.discarding());
+			HttpResponse<Void> res = HTTP.send(request(name, body, 4), HttpResponse.BodyHandlers.discarding());
 			if (res.statusCode() / 100 == 2) {
 				LOG.info("Online Watch: leave code sent");
 				return;

@@ -35,6 +35,7 @@ GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
 PAUSE = [0]  # Hypixel said "too many requests": no Hypixel requests until then (time.time())
+LAST = {}  # the newest live card of each player, for the fast updates between rounds
 REQ = {}  # Hypixel requests per hour ("<hour>": n), kept in state.json - only to see the usage
 # leaving needs this many rounds in a row offline: a lobby or server switch can show a player
 # offline for a moment
@@ -247,6 +248,35 @@ def mod_leave(name, uuid, old, last_in):
     return None
 
 
+def stale_online(name, uuid, old, now_ms):
+    """Hypixel shows online, but the mod's leave code ended the session less than 5 minutes ago and
+    no join code came after it: Hypixel has not caught up yet."""
+    t = old.get("hbLeave")
+    if not t or now_ms - t > 5 * 60000 or not has_mod(name):
+        return False
+    try:
+        joined = heartbeat.read_codes(name, uuid).get("join")
+    except Exception as e:  # cannot tell: believe Hypixel
+        print(f"{name}: codes not readable: {e!r}")
+        return False
+    return not joined or joined < t
+
+
+def fast_leaves():
+    """Between the rounds (every FAST seconds): the leave codes of the players online with the mod.
+    Only the hidden Discord channel is read, never Hypixel. {player: time of the leave code}"""
+    if not os.environ.get("HEARTBEAT_WEBHOOK") or not STATE.exists():
+        return {}
+    players = json.loads(STATE.read_text(encoding="utf-8")).get("players", {})
+    found = {}
+    for name, p in players.items():
+        if p.get("online") and p.get("uuid") and has_mod(name):
+            t = mod_leave(name, p["uuid"], p, p.get("lastLogin"))
+            if t:
+                found[name] = t
+    return found
+
+
 def code_check(name, old, st, now_ms):
     """RATTER alarm: a new login on Hypixel needs a join code from the Online Watch mod within
     HB_WAIT seconds (only for players in heartbeat.json). Keeps hbWait / hbLast in the state and
@@ -299,29 +329,39 @@ def embed(name, uuid, title, color, fields):
     }
 
 
-def check(name, old, key):
+def check(name, old, key, leave_at=None):
     """New state of a player and what happened ("join", "leave" or None).
     One Hypixel request: the status. Login and logout times are when the bot saw the player come
     online and go offline (at most a minute late) or, with the mod, the time of its leave code.
+    leave_at: a leave code the fast check between rounds found - then Hypixel is not asked at all.
     Nothing is sent from here: joins and leaves only go into sessions.csv and the live card."""
     uuid, shown = old.get("uuid"), old.get("shown")
     if not uuid:
         profile = get(f"https://api.mojang.com/users/profiles/minecraft/{name}")
         uuid, shown = profile["id"], profile.get("name")
     shown = shown or name
-    session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
-    pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on the live card
+    if leave_at:
+        session = {}
+    else:
+        session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
+    pulled = int(time.time() * 1000)  # when the data was fetched, shown on the live card
     online = bool(session.get("online"))
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     first = "online" not in old
     was = bool(old.get("online"))
     last_in, last_out = old.get("lastLogin"), old.get("lastLogout")
 
+    # Hypixel can still show a player online for a little while after the mod's leave code: that
+    # is no new login unless the mod sent a join code after the leave
+    if online and not was and not first and stale_online(name, uuid, old, pulled):
+        online, where = False, ""
+        print(f"{name}: Hypixel still shows online after the leave code, counted as offline")
+
     # Switching lobbies or servers can show a player offline for a moment: only OFF_ROUNDS rounds
     # in a row offline count as leaving (the logout is the first of them). A leave code from the
-    # mod (sent when disconnecting) ends the session at once, at its time.
+    # mod (sent when disconnecting or closing the game) ends the session at once, at its time.
     miss, off_at = 0, None
-    left = mod_leave(name, uuid, old, last_in) if not online and was else None
+    left = leave_at or (mod_leave(name, uuid, old, last_in) if not online and was else None)
     if left:
         last_out = left
         print(f"{name}: leave code from the mod, left at once")
@@ -401,9 +441,11 @@ def alarm(webhook, title, card, uid, text):
             send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
 
 
-def main():
+def main(leaves=None):
     """One round: the status of every player, the RATTER check, sessions.csv, the live message.
-    The only messages in the channel are the live message and RATTER alarms."""
+    The only messages in the channel are the live message and RATTER alarms.
+    leaves: {player: time of a leave code} from the fast check between rounds - then only those
+    players are updated (without asking Hypixel), the others keep their card from the last round."""
     EVENTS.clear()
     LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
@@ -430,8 +472,12 @@ def main():
     ratters, errors = [], 0
     for name in names:
         old = players.get(name, {})
+        if leaves is not None and name not in leaves:
+            if name in LAST:
+                LIVE[name] = LAST[name]
+            continue
         try:
-            players[name], event = check(name, old, key)
+            players[name], event = check(name, old, key, (leaves or {}).get(name))
         except (Denied, Throttled, urllib.error.HTTPError) as e:
             why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else str(e)
             print(f"{name}: not checked: {why}")
@@ -439,6 +485,7 @@ def main():
             # the live card says why, instead of showing an old status as if it were current
             LIVE[name] = embed(old.get("shown") or name, old.get("uuid") or "", f"⚠️ {old.get('shown') or name}",
                                GREY, [("Status", f"not visible: {why}")])
+            LAST[name] = LIVE[name]
             continue
         st = players[name]
         card = code_check(name, old, st, int(time.time() * 1000))
@@ -448,6 +495,7 @@ def main():
         code = mod_status(st) if st["online"] else None
         if code:
             set_mod_field(LIVE[name], code)
+        LAST[name] = LIVE[name]
         if event:
             print(f"{name}: {event}" + (f" ({code})" if code else ""))
         else:
@@ -557,6 +605,19 @@ def loop(minutes, every):
         except Exception as e:  # network trouble etc.: try again next round
             print(f"check failed: {e!r}")
         save()
+        # until the next round: every FAST seconds the mod's leave codes (hidden channel only),
+        # so that closing the game shows on the live card within seconds
+        fast = float(os.environ.get("FAST") or 10)
+        while fast and time.time() - start + fast < every:
+            time.sleep(fast)
+            try:
+                found = fast_leaves()
+                if found:
+                    print(f"leave code(s) between rounds: {', '.join(found)}")
+                    main(found)
+                    save(True)
+            except Exception as e:
+                print(f"fast check failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
             print(f"Hypixel requests in the last 24 h: {today()}")
