@@ -336,8 +336,18 @@ def overview_all():
         print(f"test overview sent: {len(cards)}")
 
 
+# a name for every git command: a rebase writes commits too (without it every push failed
+# as soon as someone else had pushed to main)
+BOT = {"GIT_AUTHOR_NAME": "online-watch", "GIT_AUTHOR_EMAIL": "online-watch@users.noreply.github.com",
+       "GIT_COMMITTER_NAME": "online-watch", "GIT_COMMITTER_EMAIL": "online-watch@users.noreply.github.com"}
+
+
 def git(*args):
-    return subprocess.run(["git", *args], cwd=STATE.parent, capture_output=True, text=True)
+    r = subprocess.run(["git", *args], cwd=STATE.parent, capture_output=True, text=True,
+                       env={**os.environ, **BOT})
+    if r.returncode and args[0] not in ("status", "rev-parse"):
+        print(f"git {args[0]} failed: {(r.stderr or r.stdout).strip()[:300]}")
+    return r
 
 
 def blobs():
@@ -358,8 +368,7 @@ def save(now=False):
         return
     SAVED[0] = time.time()
     git("add", *[f for f in ("state.json", "sessions.csv") if (STATE.parent / f).exists()])
-    git("-c", "user.name=online-watch", "-c", "user.email=online-watch@users.noreply.github.com",
-        "commit", "-q", "-m", "state")
+    git("commit", "-q", "-m", "state")
     for attempt in range(4):
         if git("pull", "-q", "--rebase").returncode != 0:
             git("rebase", "--abort")
