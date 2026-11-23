@@ -5,21 +5,27 @@
       "online": false,
       "where": null,
       "lastLogin": null,
-      "lastLogout": null
+      "lastLogout": null,
+      "total": 0,
+      "counted": null
     },
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "online": false,
       "where": null,
       "lastLogin": 1795408033007,
-      "lastLogout": 1795408183971
+      "lastLogout": 1795408183971,
+      "total": 9000000,
+      "counted": 1795408033007
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "online": false,
       "where": null,
-      "lastLogin": 1795407651416,
-      "lastLogout": 1795413056490
+      "lastLogin": 1795418873441,
+      "lastLogout": 1795419046045,
+      "total": 5400000,
+      "counted": 1795418873441
     }
   },
   "live": "1574316925746679821"
