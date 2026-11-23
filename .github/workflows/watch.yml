@@ -7,18 +7,16 @@ name: Online Watch
 on:
   schedule:
     - cron: "17 * * * *"
+  # "Run workflow" (re)starts the watch; it waits until a watching run has ended
   workflow_dispatch:
     inputs:
-      overview:
-        description: "Send an overview of all accounts"
+      # kept only so that runs started by older code still start (they send these); ignored
+      loop:
+        description: "(ignored)"
         type: boolean
         default: true
-      test_ping:
-        description: "Only send test pings: a player, several (comma) or all"
-        type: string
-        default: ""
-      loop:
-        description: "Keep watching (started by the watch itself, leave off)"
+      overview:
+        description: "(ignored)"
         type: boolean
         default: false
 
@@ -27,8 +25,8 @@ permissions:
   actions: write
 
 concurrency:
-  # one watching run at a time (the next one waits); manual overviews and test pings never wait
-  group: ${{ (github.event_name == 'schedule' || inputs.loop) && 'watch' || format('manual-{0}', github.run_id) }}
+  # one watching run at a time; the next one waits
+  group: watch
   cancel-in-progress: false
 
 jobs:
@@ -44,14 +42,9 @@ jobs:
           # hidden channel with the join codes of the Online Watch mod (RATTER alarm)
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
           PLAYERS: ${{ vars.PLAYERS }}
+          # pinged only with a RATTER alarm
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
-          OVERVIEW: ${{ inputs.overview }}
-          TEST_PING: ${{ inputs.test_ping }}
-          # manual runs only report; the watching run is the only one that saves the state
-          LOOP: ${{ github.event_name == 'schedule' || inputs.loop }}
           GITHUB_TOKEN: ${{ github.token }}
-          # test: overview card of all players every N minutes; 0 = off
-          OVERVIEW_EVERY: 0
           # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
           RAT_PINGS: 3
           HB_WAIT: 180

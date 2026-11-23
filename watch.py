@@ -134,23 +134,6 @@ def live(webhook, msg_id, bottom=False):
     return msg["id"]
 
 
-def post(webhook, embeds, joined=()):
-    """The cards first (at most 10 per message); a join card goes on its own, followed by a
-    message with nothing but the player's ping right under it - embeds themselves never ping.
-    joined: (card, Discord user id or None, player); returns {player: id of their join message},
-    so that the card can be edited later (the mod's code verified after it was sent)."""
-    for i in range(0, len(embeds), 10):
-        send(webhook, {"embeds": embeds[i:i + 10]})
-    sent = {}
-    sep = "&" if "?" in webhook else "?"
-    for card, uid, *who in joined:
-        msg = send(webhook, {"embeds": [card]}, url=f"{webhook}{sep}wait=true")
-        if who and msg:
-            sent[who[0]] = msg.get("id")
-        if uid:
-            send(webhook, {"content": f"<@{uid}>", "allowed_mentions": {"parse": [], "users": [uid]}})
-    return sent
-
 
 MOD_FIELD = "Mod code"
 
@@ -175,13 +158,6 @@ def set_mod_field(card, text):
     card["fields"] = fields
     return card
 
-
-def edit_card(webhook, msg_id, card):
-    """Edits a message the bot sent before (the join card, once the code is in)."""
-    try:
-        send(webhook, {"embeds": [card]}, "PATCH", f"{webhook.split('?')[0]}/messages/{msg_id}")
-    except Exception as e:
-        print(f"could not edit the join card: {e!r}")
 
 
 def ts(ms, style="f"):
@@ -255,7 +231,7 @@ def has_mod(name):
 def mod_leave(name, uuid, old, last_in):
     """The time of a fresh leave code from the mod for this session (ms), else None.
     Only asked when Hypixel shows a player offline who was online: one read of the hidden channel."""
-    if os.environ.get("LOOP", "").lower() != "true" or not has_mod(name):
+    if not has_mod(name):
         return None
     try:
         codes = heartbeat.read_codes(name, uuid)
@@ -323,17 +299,18 @@ def embed(name, uuid, title, color, fields):
     }
 
 
-def check(name, old, key, overview=False):
-    """New state of a player and the card for it (None when nothing happened).
+def check(name, old, key):
+    """New state of a player and what happened ("join", "leave" or None).
     One Hypixel request: the status. Login and logout times are when the bot saw the player come
-    online and go offline (at most a minute late), so the player endpoint is never needed."""
+    online and go offline (at most a minute late) or, with the mod, the time of its leave code.
+    Nothing is sent from here: joins and leaves only go into sessions.csv and the live card."""
     uuid, shown = old.get("uuid"), old.get("shown")
     if not uuid:
         profile = get(f"https://api.mojang.com/users/profiles/minecraft/{name}")
         uuid, shown = profile["id"], profile.get("name")
     shown = shown or name
     session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
-    pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on every card
+    pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on the live card
     online = bool(session.get("online"))
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     first = "online" not in old
@@ -341,15 +318,14 @@ def check(name, old, key, overview=False):
     last_in, last_out = old.get("lastLogin"), old.get("lastLogout")
 
     # Switching lobbies or servers can show a player offline for a moment: only OFF_ROUNDS rounds
-    # in a row offline count as leaving (the logout is the first of them). Until then they stay
-    # online - no leave card, and no second join ping afterwards.
-    # A leave code from the mod (sent when disconnecting) ends the session at once, at its time.
+    # in a row offline count as leaving (the logout is the first of them). A leave code from the
+    # mod (sent when disconnecting) ends the session at once, at its time.
     miss, off_at = 0, None
-    left = mod_leave(name, uuid, old, last_in) if not online and was and not overview else None
+    left = mod_leave(name, uuid, old, last_in) if not online and was else None
     if left:
         last_out = left
         print(f"{name}: leave code from the mod, left at once")
-    elif not online and was and not overview:
+    elif not online and was:
         miss = old.get("miss", 0) + 1
         off_at = old.get("offAt") or pulled
         if miss < OFF_ROUNDS:
@@ -367,32 +343,13 @@ def check(name, old, key, overview=False):
     logout = ts(last_out) + " (" + ts(last_out, "R") + ")" if last_out else None
     played = span(last_out - last_in) if last_in and last_out and last_out > last_in else None
 
-    msg = None
-    ping = False
-    if overview or first:
-        # overview cards in the same colours as the join / leave cards: green online, red offline
-        if overview and not first:
-            title = f"🟢 {shown} is online" if online else f"🔴 {shown} is offline"
-            color = GREEN if online else RED
-        else:
-            title, color = f"👀 Now watching {shown}", BLUE
-        msg = embed(shown, uuid, title, color,
-                    [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
-                     ("Online since" if online else "Last login", login),
-                     ("Last logout", None if online else logout)])
-    elif online and not was:
-        # a ping once per login
-        ping = last_in != old.get("pinged")
-        msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN, [("Mode", where or "?"), ("Since", login)])
-    elif not online and was:
-        msg = embed(shown, uuid, f"🔴 {shown} was online", RED,
-                    [("Login", login), ("Logout", logout), ("Played", played)])
-    # a server or mode change sends nothing: it only shows on the live card
-
-    if not first and not overview:
+    event = None
+    if not first:
         if online and not was:
+            event = "join"
             EVENTS.append((last_in, shown, "join", where, ""))
         elif not online and was:
+            event = "leave"
             EVENTS.append((last_out, shown, "leave", "", played or ""))
 
     total, counted = playtime(old, last_in, last_out, shown)
@@ -400,25 +357,24 @@ def check(name, old, key, overview=False):
                    GREEN if online else RED,
                    [("Status", "🟢 online" if online else "⚫ offline"), ("Server", on),
                     ("Online since" if online else "Last login", login),
-                    ("Last logout", None if online else logout)])
+                    ("Last logout", None if online else logout),
+                    ("Last session", played if not online else None)])
     # the live card: the total including the session going on right now
     running = pulled - last_in if online and last_in and last_in != counted else 0
     status["fields"].append({"name": "Total played", "value": span(total + running) + " since tracking began",
                              "inline": False})
+    status["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
+                             "inline": False})
     LIVE[name] = status
-    for card in (msg, status):
-        if card:
-            card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
-                                   "inline": False})
     state = {"uuid": uuid, "shown": shown, "online": online, "where": where if online else None,
              "server": on, "lastLogin": last_in, "lastLogout": last_out, "total": total,
-             "counted": counted, "v": 2, "pinged": last_in if ping else old.get("pinged"),
-             "statusAt": pulled}
+             "counted": counted, "v": 2, "statusAt": pulled}
     if left or old.get("hbLeave"):
         state["hbLeave"] = left or old["hbLeave"]
     if miss:
         state.update({"miss": miss, "offAt": off_at})
-    return state, msg, ping
+    return state, event
+
 
 
 def write_log():
@@ -432,7 +388,7 @@ def write_log():
         if new:
             f.write("time,player,event,mode,played\n")
         for ms, name, event, mode, played in sorted(EVENTS):
-            when = datetime.fromtimestamp(ms / 1000, tz).strftime("%Y-%m-%d %H:%M")
+            when = datetime.fromtimestamp(ms / 1000, tz).strftime("%Y-%m-%d %H:%M:%S")
             f.write(f"{when},{name},{event},{mode},{played}\n")
     EVENTS.clear()
 
@@ -446,12 +402,12 @@ def alarm(webhook, title, card, uid, text):
 
 
 def main():
+    """One round: the status of every player, the RATTER check, sessions.csv, the live message.
+    The only messages in the channel are the live message and RATTER alarms."""
     EVENTS.clear()
     LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
-    overview = os.environ.get("OVERVIEW", "").lower() == "true"
-    watching = os.environ.get("LOOP", "").lower() == "true"
     names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
     if not webhook or not key:
         print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
@@ -462,7 +418,7 @@ def main():
     # a copy: comparing the new state with a dict changed in place would never see a change
     players = json.loads(json.dumps(saved.get("players", {})))
 
-    # Discord user IDs to ping, e.g. "mrkioko=123456789012345678, Knuffiman=..."
+    # Discord user IDs, pinged only with a RATTER alarm, e.g. "mrkioko=123456789012345678, ..."
     ids = {}
     for pair in (os.environ.get("DISCORD_IDS") or "").split(","):
         if "=" in pair:
@@ -470,39 +426,12 @@ def main():
             v = "".join(c for c in v if c.isdigit())
             if v:
                 ids[k.strip().lower()] = v
-    test = (os.environ.get("TEST_PING") or "").strip()
-    if test:
-        # "all" or names separated by commas: the real card with live data for each, as if the
-        # player had just joined (offline: their status card), each with its ping under it; the
-        # saved state is left alone
-        wanted = names if test.lower() == "all" else [t.strip() for t in test.split(",") if t.strip()]
-        joined = []
-        for t in wanted:
-            name = next((n for n in names if n.lower() == t.lower()), t)
-            uid = ids.get(name.lower())
-            if not uid:
-                print(f"TEST_PING: no Discord ID for {name}")
-                continue
-            old = {k: v for k, v in players.get(name, {}).items() if k in ("uuid", "shown", "lastLogin", "lastLogout")}
-            try:
-                _, card, _ = check(name, {**old, "online": False}, key)
-                if card is None:  # offline: the status card instead
-                    _, card, _ = check(name, {**old, "online": False}, key, True)
-            except (Denied, Throttled) as e:
-                print(f"TEST_PING: {name}: {e}")
-                continue
-            card["footer"] = {"text": f"{card['footer']['text']} • test"}
-            joined.append((card, uid))
-        EVENTS.clear()
-        post(webhook, [], joined)
-        print(f"test pings sent: {len(joined)}")
-        return 0 if joined else 1
 
-    embeds, joined, ratters, errors = [], [], [], 0
+    ratters, errors = [], 0
     for name in names:
         old = players.get(name, {})
         try:
-            players[name], msg, ping = check(name, old, key, overview)
+            players[name], event = check(name, old, key)
         except (Denied, Throttled, urllib.error.HTTPError) as e:
             why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else str(e)
             print(f"{name}: not checked: {why}")
@@ -512,58 +441,32 @@ def main():
                                GREY, [("Status", f"not visible: {why}")])
             continue
         st = players[name]
-        if watching:
-            card = code_check(name, old, st, int(time.time() * 1000))
-            if card:
-                ratters.append((card, ids.get(name.lower())))
-                print(f"{name}: RATTER ALARM (no join code)")
-        code = mod_status(st) if watching and st["online"] else None
+        card = code_check(name, old, st, int(time.time() * 1000))
+        if card:
+            ratters.append((card, ids.get(name.lower())))
+            print(f"{name}: RATTER ALARM (no join code)")
+        code = mod_status(st) if st["online"] else None
         if code:
             set_mod_field(LIVE[name], code)
-        # the join card of this login was sent while the code was still awaited: edit it now
-        was_waiting = old.get("hbWait") or {}
-        if was_waiting.get("msg") and not st.get("hbWait") and was_waiting.get("login") == st.get("lastLogin"):
-            edit_card(webhook, was_waiting["msg"],
-                      set_mod_field(was_waiting["card"], mod_status(st) or "❌ no code – RATTER ALARM"))
-            print(f"{name}: join card edited: {mod_status(st)}")
-        if msg:
-            if code and msg["title"].startswith("🟢"):
-                set_mod_field(msg, code)
-            # only when the player has just come online - not again while they stay online;
-            # a join card still waiting for the code goes on its own, to be edited later
-            uid = ids.get(name.lower()) if ping else None
-            if uid or st.get("hbWait"):
-                joined.append((msg, uid, name))
-            else:
-                embeds.append(msg)
-            print(f"{name}: {msg['title']}" + (f" ({code})" if code else ""))
+        if event:
+            print(f"{name}: {event}" + (f" ({code})" if code else ""))
         else:
             print(f"{name}: {'online' if st['online'] else 'offline'}, nichts Neues")
     for card, uid in ratters:
         alarm(webhook, "RATTER ALARM", card, uid, "RATTER ALARM – someone else may be on your account!")
-    # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
-    # the bottom again
-    moved = bool(embeds or joined or ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
-    if embeds or joined:
-        for name, msg_id in post(webhook, embeds, joined).items():
-            wait = players[name].get("hbWait")
-            if wait and msg_id:  # remember the join card, to show the code once it is verified
-                card = next(c for c, _, n in joined if n == name)
-                wait.update({"msg": msg_id, "card": card})
     write_log()
+    # after an alarm, or in the first round of a run, the live message goes to the bottom again
+    moved = bool(ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
+    order = {n: LIVE[n] for n in names if n in LIVE}  # always in the order of PLAYERS
+    LIVE.clear()
+    LIVE.update(order)
     live_id = saved.get("live")
-    if watching:  # only the watching run keeps the live message
-        order = {n: LIVE[n] for n in names if n in LIVE}  # always in the order of PLAYERS
-        LIVE.clear()
-        LIVE.update(order)
-        try:
-            live_id = live(webhook, live_id, moved)
-        except Exception as e:
-            print(f"live message failed: {e!r}")
+    try:
+        live_id = live(webhook, live_id, moved)
+    except Exception as e:
+        print(f"live message failed: {e!r}")
     LIVE.clear()
 
-    if not watching:
-        return 2 if errors == len(names) else 0  # manual runs only report, the state stays as it is
     new = {"players": {n: players[n] for n in names if n in players}}
     hour = int(time.time()) // 3600
     new["req"] = {k: v for k, v in sorted(REQ.items()) if hour - int(k) < 25}
@@ -575,23 +478,6 @@ def main():
         print(f"Hypixel requests paused for {PAUSE[0] - time.time():.0f} s (too many requests)")
     return 2 if errors == len(names) else 0
 
-
-def overview_all():
-    """Test: the overview card of every player, without touching the saved state."""
-    key, webhook = os.environ.get("HYPIXEL_KEY", ""), os.environ.get("DISCORD_WEBHOOK", "")
-    names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
-    saved = json.loads(STATE.read_text(encoding="utf-8")).get("players", {}) if STATE.exists() else {}
-    cards = []
-    for name in names:
-        try:
-            _, card, _ = check(name, {"online": False, **saved.get(name, {})}, key, True)
-            cards.append(card)
-        except Exception as e:
-            print(f"{name}: overview failed: {e!r}")
-    EVENTS.clear()
-    if cards:
-        post(webhook, cards)
-        print(f"test overview sent: {len(cards)}")
 
 
 # a name for every git command: a rebase writes commits too (without it every push failed
@@ -642,7 +528,7 @@ def dispatch():
     if not repo or not token:
         return
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-    body = {"ref": os.environ.get("GITHUB_REF_NAME", "main"), "inputs": {"loop": "true", "overview": "false"}}
+    body = {"ref": os.environ.get("GITHUB_REF_NAME", "main"), "inputs": {"loop": "true"}}
     req = urllib.request.Request(f"{api}/repos/{repo}/actions/workflows/watch.yml/dispatches",
                                  data=json.dumps(body).encode(), method="POST",
                                  headers={**UA, "Authorization": f"Bearer {token}",
@@ -663,9 +549,6 @@ def loop(minutes, every):
     end = time.time() + minutes * 60
     code, synced = blobs(), time.time()
     os.environ["LIVE_TO_BOTTOM"] = "1"
-    # test: every OVERVIEW_EVERY minutes the card of all players (0 or empty = off)
-    test_every = float(os.environ.get("OVERVIEW_EVERY") or 0) * 60
-    last_test = 0
     while time.time() < end:
         start = time.time()
         try:
@@ -674,12 +557,6 @@ def loop(minutes, every):
         except Exception as e:  # network trouble etc.: try again next round
             print(f"check failed: {e!r}")
         save()
-        if test_every and time.time() - last_test >= test_every:
-            last_test = time.time()
-            try:
-                overview_all()
-            except Exception as e:
-                print(f"test overview failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
             print(f"Hypixel requests in the last 24 h: {today()}")
@@ -695,6 +572,5 @@ def loop(minutes, every):
 
 
 if __name__ == "__main__":
-    if os.environ.get("LOOP", "").lower() == "true":
-        sys.exit(loop(int(os.environ.get("LOOP_MINUTES") or 345), int(os.environ.get("EVERY") or 60)))
-    sys.exit(main())
+    # every run watches: a check every minute for almost 6 hours, then the next run
+    sys.exit(loop(int(os.environ.get("LOOP_MINUTES") or 345), int(os.environ.get("EVERY") or 60)))
