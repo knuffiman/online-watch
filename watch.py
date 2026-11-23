@@ -31,6 +31,24 @@ GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
 PAUSE = [0]  # Hypixel said "too many requests": no Hypixel requests until then (time.time())
+REQ = {}  # Hypixel requests per hour ("<hour>": n), kept in state.json: the key has a daily limit
+LAST = {}  # the newest live card of each player, for rounds in which a player is not asked
+
+
+def count(n=1):
+    hour = str(int(time.time()) // 3600)
+    REQ[hour] = REQ.get(hour, 0) + n
+
+
+def today():
+    """Hypixel requests in the last 24 hours."""
+    now = int(time.time()) // 3600
+    return sum(v for k, v in REQ.items() if now - int(k) < 24)
+
+
+def thrifty():
+    """Over the daily budget: ask even less often (HYPIXEL_DAILY_BUDGET, default 3000)."""
+    return today() > int(os.environ.get("HYPIXEL_DAILY_BUDGET") or 3000)
 
 
 class Throttled(Exception):
@@ -41,6 +59,8 @@ def get(url, headers=None):
     if "hypixel.net" in url and time.time() < PAUSE[0]:
         raise Throttled(f"paused for {PAUSE[0] - time.time():.0f} s more")
     req = urllib.request.Request(url, headers={**UA, **(headers or {})})
+    if "hypixel.net" in url:
+        count()
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
             return json.loads(r.read().decode("utf-8"))
@@ -52,7 +72,7 @@ def get(url, headers=None):
             except Exception:
                 body = ""
             wait = int(h.get("Retry-After") or h.get("RateLimit-Reset") or 60)
-            PAUSE[0] = time.time() + max(30, min(wait, 600))
+            PAUSE[0] = time.time() + max(30, min(wait, 3600))
             print(f"Hypixel HTTP 429 ({url.split('?')[0].split('/v2/')[-1]}): limit {h.get('RateLimit-Limit')}, "
                   f"left {h.get('RateLimit-Remaining')}, reset in {h.get('RateLimit-Reset')} s, "
                   f"retry-after {h.get('Retry-After')}; {body} -> pausing {PAUSE[0] - time.time():.0f} s")
@@ -311,9 +331,19 @@ def check(name, old, key, overview=False):
     uuid = old.get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
     auth = {"API-Key": key}
     session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", auth).get("session") or {}
-    player = get(f"https://api.hypixel.net/v2/player?uuid={uuid}", auth).get("player") or {}
     pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on every card
     online = bool(session.get("online"))
+    # The login times (player endpoint) only when something changed, or every few minutes while
+    # online (a second login: RATTER check) and once an hour while offline - the key has a daily limit.
+    every = (180 if online else 3600) * (3 if thrifty() else 1)
+    if (overview or "online" not in old or online != old.get("online") or old.get("miss")
+            or pulled - old.get("playerAt", 0) >= every * 1000):
+        player = get(f"https://api.hypixel.net/v2/player?uuid={uuid}", auth).get("player") or {}
+        player_at = pulled
+    else:
+        player = {"lastLogin": old.get("lastLogin"), "lastLogout": old.get("lastLogout"),
+                  "displayname": old.get("shown")}
+        player_at = old.get("playerAt", 0)
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     last_in, last_out = player.get("lastLogin"), player.get("lastLogout")
     # Switching lobbies or servers can show a player offline for a moment. Only a new logout
@@ -383,13 +413,15 @@ def check(name, old, key, overview=False):
     status["fields"].append({"name": "Total played", "value": span(total + running) + " since tracking began",
                              "inline": False})
     LIVE[name] = status
+    LAST[name] = status
     for card in (msg, status):
         if card:
             card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2, "server": on, "nw": old.get("nw"), "nwHist": old.get("nwHist"), "pinged": last_in if ping else old.get("pinged")}
+             "v": 2, "server": on, "nw": old.get("nw"), "nwHist": old.get("nwHist"), "pinged": last_in if ping else old.get("pinged"),
+             "shown": shown, "playerAt": player_at, "statusAt": pulled, "nwAt": old.get("nwAt", 0)}
     if miss:
         state["miss"] = miss
     if old.get("ratAt"):
@@ -424,6 +456,8 @@ def main():
         print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
         return 1
     saved = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+    if not REQ:
+        REQ.update(saved.get("req", {}))
     # a copy: comparing the new state with a dict changed in place would never see a change
     players = json.loads(json.dumps(saved.get("players", {})))
     if "name" in saved:  # Stand aus der Version für einen Spieler übernehmen
@@ -494,12 +528,17 @@ def main():
     # networth every 5 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
     rats, ratters = [], []
-    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290 and time.time() >= PAUSE[0]:
-        uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
+    slow = 3 if thrifty() else 1
+    due = [n for n in names if players.get(n, {}).get("uuid")
+           and now - players[n].get("nwAt", 0) >= (290 if players[n].get("online") else 3590) * slow]
+    if os.environ.get("LOOP", "").lower() == "true" and due and time.time() >= PAUSE[0]:
+        uuids = {players[n]["uuid"]: n for n in due}
+        count(2 * len(uuids))  # profiles + museum
         result = networth(list(uuids)) if uuids else {}
         for uuid, n in uuids.items():
             if uuid in result:
                 players[n]["nw"] = result[uuid]
+                players[n]["nwAt"] = now
                 if result[uuid].get("error"):
                     print(f"{n}: networth: {result[uuid]['error']}")
                     if "429" in result[uuid]["error"]:
@@ -514,6 +553,11 @@ def main():
                         print(f"{n}: RAT ALARM")
     for name in names:
         old = players.get(name, {})
+        wait = 120 * (3 if thrifty() else 1)  # offline: status every 2 minutes (6 when thrifty)
+        if (os.environ.get("LOOP", "").lower() == "true" and not overview and old.get("online") is False
+                and name in LAST and time.time() * 1000 - old.get("statusAt", 0) < wait * 1000):
+            LIVE[name] = LAST[name]
+            continue
         try:
             players[name], msg, ping = check(name, old, key, overview)
         except urllib.error.HTTPError as e:
@@ -568,6 +612,8 @@ def main():
     LIVE.clear()
 
     new = {"players": {n: players[n] for n in names if n in players}}
+    hour = int(time.time()) // 3600
+    new["req"] = {k: v for k, v in sorted(REQ.items()) if hour - int(k) < 25}
     if live_id:
         new["live"] = live_id
     if nw_at:
@@ -685,6 +731,7 @@ def loop(minutes, every):
                 print(f"test overview failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
+            print(f"Hypixel requests in the last 24 h: {today()}" + (" (thrifty)" if thrifty() else ""))
             save(True)  # a pull needs a clean tree
             git("pull", "-q", "--rebase")
             if blobs() != code:

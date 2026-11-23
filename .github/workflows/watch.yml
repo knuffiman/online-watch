@@ -66,4 +66,7 @@ jobs:
           RAT_MIN_COINS: 100000000
           RAT_MINUTES: 30
           RAT_PINGS: 3
+          # the Hypixel developer key has a daily limit: above this many requests in 24 h the
+          # bot asks three times less often
+          HYPIXEL_DAILY_BUDGET: 3000
         run: python3 -u watch.py
