@@ -250,8 +250,7 @@ def check(name, old, key, overview=False):
     elif not online and (old["online"] or last_in != old.get("lastLogin")):
         msg = embed(shown, uuid, f"🔴 {shown} was online", RED,
                     [("Login", login), ("Logout", logout), ("Played", played)])
-    elif online and where and old.get("where") and where != old["where"]:
-        msg = embed(shown, uuid, f"🔁 {shown} is now playing {where}", GREY, [("Online since", login)])
+    # a server or mode change sends nothing: it only shows on the live card
 
     if "online" in old:
         now = int(time.time() * 1000)
@@ -353,10 +352,7 @@ def main():
         print(f"test pings sent: {len(joined)}")
         return 0 if joined else 1
     embeds, joined, errors = [], [], 0
-    # Joins and leaves go out at once; anything else (a mode change) waits and goes out at most
-    # once an hour, only its newest card per player.
-    pending = dict(saved.get("pending", {}))
-    last_quiet = saved.get("lastQuiet", 0)
+    # only joins and leaves send a message
     now = int(time.time())
     # networth every 15 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
@@ -378,11 +374,7 @@ def main():
             print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
             errors += 1
             continue
-        if msg and not overview and msg["title"].startswith("🔁"):
-            pending[name] = msg
-            print(f"{name}: {msg['title']} (waits for the hourly message)")
-        elif msg:
-            pending.pop(name, None)
+        if msg:
             # only when the player has just come online - not again while they stay online
             if ping and ids.get(name.lower()):
                 joined.append((msg, ids[name.lower()]))
@@ -391,10 +383,6 @@ def main():
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
-    if pending and now - last_quiet >= 3600:
-        embeds += [pending[n] for n in names if n in pending]
-        pending = {}
-        last_quiet = now
     # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
     # the bottom again
     moved = bool(embeds or joined) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
@@ -413,10 +401,6 @@ def main():
     LIVE.clear()
 
     new = {"players": {n: players[n] for n in names if n in players}}
-    if pending:
-        new["pending"] = pending
-    if last_quiet:
-        new["lastQuiet"] = last_quiet
     if live_id:
         new["live"] = live_id
     if nw_at:
