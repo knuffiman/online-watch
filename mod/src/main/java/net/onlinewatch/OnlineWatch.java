@@ -107,7 +107,7 @@ public class OnlineWatch implements ClientModInitializer {
 		currentId = uuid.toString().replace("-", "");
 		joinCode = code(name, currentId, null);
 		// async: joining never waits for Discord
-		sendAsync(name, "{\"join\":" + joinCode + "}", 3);
+		sendAsync(name, "{\"join\":" + joinCode + "}", 3, "join");
 	}
 
 	private void onLeave() {
@@ -124,15 +124,27 @@ public class OnlineWatch implements ClientModInitializer {
 		// right away and waiting for it (at most a few seconds): when the game is being closed,
 		// an async request would die with it
 		try {
-			HttpResponse<Void> res = HTTP.send(request(name, body, 4), HttpResponse.BodyHandlers.discarding());
+			HttpResponse<String> res = HTTP.send(request(name, body, 4), HttpResponse.BodyHandlers.ofString());
 			if (res.statusCode() / 100 == 2) {
 				LOG.info("Online Watch: leave code sent");
 				return;
 			}
-			LOG.warn("Online Watch: leave code not sent ({})", res.statusCode());
+			LOG.warn("Online Watch: leave code not sent ({}), trying again in the background", why(name, res));
 		} catch (Exception e) {
-			LOG.warn("Online Watch: leave code not sent ({})", e.toString());
+			LOG.warn("Online Watch: leave code not sent ({}), trying again in the background", e.toString());
 		}
+		// the game is still running (left the server, not closed): two more tries in the background
+		sendAsync(name, body, 2, "leave");
+	}
+
+	/** Status and Discord's own reason (e.g. "Unknown Message"), plus which message was meant. */
+	private String why(String name, HttpResponse<String> res) {
+		String reason = res.body() == null ? "" : res.body().replaceAll("\\s+", " ");
+		if (reason.length() > 200) {
+			reason = reason.substring(0, 200);
+		}
+		return res.statusCode() + " " + reason + " - message " + accounts.get(name.toLowerCase(Locale.ROOT)).message()
+				+ " of " + name;
 	}
 
 	/** A signed code: name, uuid, time, a random nonce and (for a leave) the event. */
@@ -169,20 +181,23 @@ public class OnlineWatch implements ClientModInitializer {
 				.build();
 	}
 
-	private void sendAsync(String name, String content, int tries) {
-		HTTP.sendAsync(request(name, content, 15), HttpResponse.BodyHandlers.discarding()).whenComplete((res, err) -> {
+	private void sendAsync(String name, String content, int tries, String what) {
+		HTTP.sendAsync(request(name, content, 15), HttpResponse.BodyHandlers.ofString()).whenComplete((res, err) -> {
 			if (err == null && res.statusCode() / 100 == 2) {
-				LOG.info("Online Watch: join code sent");
-			} else if (tries > 1) {
-				LOG.warn("Online Watch: sending failed ({}), trying again", err != null ? err.toString() : res.statusCode());
+				LOG.info("Online Watch: {} code sent", what);
+				return;
+			}
+			String reason = err != null ? err.toString() : why(name, res);
+			if (tries > 1) {
+				LOG.warn("Online Watch: sending the {} code failed ({}), trying again", what, reason);
 				try {
 					Thread.sleep(5000);
 				} catch (InterruptedException ignored) {
 					Thread.currentThread().interrupt();
 				}
-				sendAsync(name, content, tries - 1);
+				sendAsync(name, content, tries - 1, what);
 			} else {
-				LOG.warn("Online Watch: could not send the join code");
+				LOG.warn("Online Watch: could not send the {} code ({})", what, reason);
 			}
 		});
 	}
