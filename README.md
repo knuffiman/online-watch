@@ -1,7 +1,7 @@
 # online-watch
 
-GitHub Actions prüft alle 5 Minuten über die Hypixel-API, wann **mrkioko**, **Knuffiman** und **_gggaming** zuletzt online waren,
-und schreibt Änderungen in einen Discord-Kanal. Läuft ohne eigenen PC.
+GitHub Actions prüft jede Minute über die Hypixel-API, wann **mrkioko**, **Knuffiman** und **_gggaming** zuletzt online waren,
+und schreibt Änderungen in einen Discord-Kanal (dazu eine angepinnte Live-Statusnachricht, die jede Minute aktualisiert wird). Läuft ohne eigenen PC.
 
 Einrichten (einmal): Repo → Settings → Secrets and variables → Actions → New repository secret
 
