@@ -1,9 +1,10 @@
 name: Build mod
 
-# Builds the Online Watch mod (mod/): ONE jar for all watched accounts, with the hidden-channel
-# webhook and, per account, its message id and key built in. Whoever plays on any of these
-# accounts with it sends that account's join and leave codes. The jar goes ONLY into the hidden
-# Discord channel and is never uploaded to GitHub: the repo is public and the jar holds the keys.
+# Builds the Online Watch mod (mod/) for every supported Minecraft version: ONE jar per version for
+# all watched accounts, with the hidden-channel webhook, the shared code message and every
+# account's key built in. Both jars replace the ones in the single mod message of the hidden
+# Discord channel (edited, never a new message). They are never uploaded to GitHub: the repo is
+# public and the jars hold the keys.
 
 on:
   workflow_dispatch:
@@ -12,11 +13,6 @@ on:
         description: "Accounts the mod is for, comma separated (empty: the watched players)"
         type: string
         default: ""
-      minecraft:
-        description: "Minecraft version"
-        type: choice
-        options: ["26.2", "26.1.2"]
-        default: "26.2"
 
 permissions:
   contents: write
@@ -24,14 +20,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "25"
-      - name: Code messages and mod settings
+      - name: Messages and mod settings
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
@@ -43,25 +39,23 @@ jobs:
             git config user.name "online-watch"
             git config user.email "online-watch@users.noreply.github.com"
             git add heartbeat.json
-            git commit -m "heartbeat: code messages for the mod"
+            git commit -m "heartbeat: shared code message and mod message"
             for i in 1 2 3 4; do git pull --rebase -q && git push -q && break; sleep 5; done
           fi
       - name: Build
         working-directory: mod
-        env:
-          MC: ${{ inputs.minecraft }}
         run: |
-          # Fabric API for each Minecraft version
-          case "$MC" in
-            26.1.2) API=0.155.3+26.1.2 ;;
-            *) MC=26.2; API=0.161.0+26.2 ;;
-          esac
-          ./gradlew build --no-daemon -q -Pminecraft_version=$MC -Pfabric_api_version=$API
-      - name: Send the jar into the hidden channel
+          # Minecraft version and the Fabric API for it
+          for v in "26.2 0.161.0+26.2" "26.1.2 0.155.3+26.1.2"; do
+            set -- $v
+            ./gradlew build --no-daemon -q -Pminecraft_version=$1 -Pfabric_api_version=$2
+          done
+          ls build/libs
+      - name: Put the jars into the mod message
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
           PLAYERS: ${{ inputs.players || vars.PLAYERS }}
         run: |
-          python3 heartbeat.py upload mod/build/libs/onlinewatch-*.jar
+          python3 heartbeat.py upload mod/build/libs/onlinewatch-*+mc26.2.jar mod/build/libs/onlinewatch-*+mc26.1.2.jar
           rm -f mod/src/main/resources/onlinewatch.properties

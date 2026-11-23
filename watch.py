@@ -141,6 +141,8 @@ MOD_FIELD = "Mod code"
 
 def mod_status(st):
     """The line about the mod's join code for the current login, or None (no mod / offline)."""
+    if st.get("hbGone") and st["hbGone"] == heartbeat.message_id(st.get("shown") or ""):
+        return "⚠️ code message deleted – run Build mod and install the new jar"
     if st.get("hbWait"):
         return f"⏳ waiting for the code (max {int(os.environ.get('HB_WAIT') or 180) // 60} min)"
     if st.get("hbFail") and st.get("hbFail") == st.get("lastLogin"):
@@ -226,7 +228,7 @@ def server(session):
 
 
 def has_mod(name):
-    return bool(os.environ.get("HEARTBEAT_WEBHOOK")) and any(k.lower() == name.lower() for k in heartbeat.ids())
+    return bool(os.environ.get("HEARTBEAT_WEBHOOK")) and heartbeat.has(name)
 
 
 def mod_leave(name, uuid, old, last_in):
@@ -236,6 +238,8 @@ def mod_leave(name, uuid, old, last_in):
         return None
     try:
         codes = heartbeat.read_codes(name, uuid)
+    except heartbeat.MessageGone:  # shown on the live card; the usual OFF_ROUNDS rounds decide
+        return None
     except Exception as e:  # cannot read it: the usual OFF_ROUNDS rounds decide
         print(f"{name}: codes not readable: {e!r}")
         return None
@@ -283,7 +287,7 @@ def code_check(name, old, st, now_ms):
     returns the alarm card or None."""
     if not has_mod(name):
         return None
-    for k in ("hbWait", "hbLast", "hbFail"):
+    for k in ("hbWait", "hbLast", "hbFail", "hbGone"):
         if old.get(k):
             st[k] = old[k]
     login = st.get("lastLogin")
@@ -295,6 +299,15 @@ def code_check(name, old, st, now_ms):
     ref = wait.get("login") or wait["since"]
     try:
         t = heartbeat.read_code(name, st["uuid"])
+        st.pop("hbGone", None)
+    except heartbeat.MessageGone as e:
+        # deleted by hand: a setup problem, not a stolen account - no alarm, a warning on the live
+        # card until Build mod made a new message (heartbeat.json) and the new jar is in
+        if st.get("hbGone") != str(e):
+            print(f"{name}: code message {e} was deleted - run Build mod and install the new jar")
+        st["hbGone"] = str(e)
+        st.pop("hbWait", None)
+        return None
     except Exception as e:  # cannot read the code: never an alarm for that, try again next round
         print(f"{name}: join code not readable: {e!r}")
         t = None
