@@ -10,6 +10,17 @@
       "counted": null,
       "v": 2,
       "server": null,
+      "nw": {
+        "profile": "Tomato",
+        "networth": 4474207038.108562,
+        "purse": 3699868.0723750144,
+        "bank": 1000969440.2511519,
+        "noInventory": false,
+        "top": [
+          "accessories",
+          1125964792.1677577
+        ]
+      },
       "pinged": null
     },
     "Knuffiman": {
@@ -22,46 +33,43 @@
       "counted": 1795408033007,
       "v": 2,
       "server": null,
+      "nw": {
+        "profile": "Tomato",
+        "networth": 46541825791.81829,
+        "purse": 3130648910.0660043,
+        "bank": 1000969440.2511519,
+        "noInventory": false,
+        "top": [
+          "wardrobe",
+          10530019585.640152
+        ]
+      },
       "pinged": null
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "online": true,
-      "where": "Skyblock / Dynamic",
+      "where": "Skyblock / Rift",
       "lastLogin": 1795425458178,
       "lastLogout": 1795419046045,
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
-      "server": "Skyblock \u2013 Private Island",
+      "server": "Skyblock \u2013 The Rift",
+      "nw": {
+        "profile": "Tomato",
+        "networth": 31947728819.298244,
+        "purse": 261899.04100000113,
+        "bank": 1000969440.2511519,
+        "noInventory": false,
+        "top": [
+          "accessories",
+          9909274704.566248
+        ]
+      },
       "pinged": 1795425458178
     }
   },
-  "pending": {
-    "_gggaming": {
-      "title": "\ud83d\udd01 _GGgaming is now playing Skyblock / Dynamic",
-      "color": 10070709,
-      "thumbnail": {
-        "url": "https://mc-heads.net/avatar/562fe7f8702045da9182379182dead73/64"
-      },
-      "fields": [
-        {
-          "name": "Online since",
-          "value": "<t:1795425458:f> (<t:1795425458:R>)",
-          "inline": true
-        },
-        {
-          "name": "Checked",
-          "value": "<t:1795434068:T> (<t:1795434068:R>)",
-          "inline": false
-        }
-      ],
-      "footer": {
-        "text": "_GGgaming"
-      },
-      "timestamp": "2026-11-23T11:41:08.905102+00:00"
-    }
-  },
-  "lastQuiet": 1795434008,
-  "live": "1574389091154534413"
+  "live": "1574391415683686475",
+  "nwAt": 1795434560
 }
