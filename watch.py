@@ -1,10 +1,15 @@
-"""Prüft in Abständen, wann Minecraft-Accounts zuletzt auf Hypixel online waren, und meldet
-Änderungen in Discord (als Embed mit Kopf, Status und Zeiten). Läuft in GitHub Actions
+"""Prüft jede Minute, ob Minecraft-Accounts auf Hypixel online sind, und meldet Joins und Leaves
+in Discord (als Embed mit Kopf, Status und Zeiten). Läuft in GitHub Actions
 (.github/workflows/watch.yml); der Stand liegt in state.json im Repo.
+
+Pro Spieler und Runde genau eine Hypixel-Anfrage: der Online-Status (/v2/status). Login- und
+Logout-Zeiten misst der Bot selbst (wann er jemanden online / wieder offline sieht). Bei jedem neuen
+Login wartet er auf den Join-Code der Online-Watch-Mod (heartbeat.py); kommt keiner: RATTER-Alarm.
 
 Secrets (Repo → Settings → Secrets and variables → Actions):
   DISCORD_WEBHOOK  - Webhook-URL des Discord-Kanals
-  HYPIXEL_KEY      - Hypixel-API-Key (developer.hypixel.net)
+  HYPIXEL_KEY      - Hypixel-API-Key (developer.hypixel.net; ein Gilden-Key gilt nur für die Gilde)
+  HEARTBEAT_WEBHOOK - Webhook des versteckten Kanals mit den Join-Codes der Mod
 Variable (optional): PLAYERS - Spielernamen, durch Komma getrennt (Standard siehe DEFAULT)
 """
 import json
@@ -24,15 +29,16 @@ STATE = Path(__file__).resolve().parent / "state.json"
 # the database: one line per join and per leave, nothing else
 LOG = Path(__file__).resolve().parent / "sessions.csv"
 EVENTS = []
-SEEN = {}  # when each player was last checked in this run (for playtime with hidden times)
 LIVE = {}  # the current status card of each player, for the pinned live message
 UA = {"User-Agent": "online-watch/1.1"}
 GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
 PAUSE = [0]  # Hypixel said "too many requests": no Hypixel requests until then (time.time())
-REQ = {}  # Hypixel requests per hour ("<hour>": n), kept in state.json: the key has a daily limit
-LAST = {}  # the newest live card of each player, for rounds in which a player is not asked
+REQ = {}  # Hypixel requests per hour ("<hour>": n), kept in state.json - only to see the usage
+# leaving needs this many rounds in a row offline: a lobby or server switch can show a player
+# offline for a moment
+OFF_ROUNDS = 3
 
 
 def count(n=1):
@@ -46,13 +52,12 @@ def today():
     return sum(v for k, v in REQ.items() if now - int(k) < 24)
 
 
-def thrifty():
-    """Over the daily budget: ask even less often (HYPIXEL_DAILY_BUDGET, default 3000)."""
-    return today() > int(os.environ.get("HYPIXEL_DAILY_BUDGET") or 3000)
-
-
 class Throttled(Exception):
     pass
+
+
+class Denied(Exception):
+    """Hypixel refused this player (e.g. a guild key and a player outside the guild)."""
 
 
 def get(url, headers=None):
@@ -77,6 +82,12 @@ def get(url, headers=None):
                   f"left {h.get('RateLimit-Remaining')}, reset in {h.get('RateLimit-Reset')} s, "
                   f"retry-after {h.get('Retry-After')}; {body} -> pausing {PAUSE[0] - time.time():.0f} s")
             raise Throttled("429") from None
+        if e.code == 403 and "hypixel.net" in url:
+            try:
+                cause = json.loads(e.read().decode("utf-8", "replace")).get("cause") or "forbidden"
+            except Exception:
+                cause = "forbidden"
+            raise Denied(cause) from None
         raise
 
 
@@ -155,21 +166,17 @@ def logged(shown):
     return total
 
 
-def playtime(old, online, last_in, last_out, now, shown):
+def playtime(old, last_in, last_out, shown):
     """Total playtime since tracking began, kept in state.json: each finished session
-    (logout - login) counts once; when the API hides the times, every minute seen online counts."""
+    (logout - login, as the bot saw them) counts once."""
     if "total" in old and old.get("v") == 2:
         total, counted = old["total"], old.get("counted")
-    else:  # first time: what sessions.csv already has; the session behind the current times is in
-        # it only if an earlier round saw it (otherwise it is logged this round and counted below)
+    else:  # first time: what sessions.csv already has
         total = logged(shown)
         counted = last_in if last_in == old.get("lastLogin") else None
     if last_in and last_out and last_out >= last_in and last_in != counted:
         total += last_out - last_in
         counted = last_in
-    if not last_in and online and old.get("online") and SEEN.get(shown):
-        total += min(now - SEEN[shown], 600000)
-    SEEN[shown] = now
     return total, counted
 
 
@@ -199,65 +206,6 @@ def server(session):
     if where_map and where_map not in parts:
         parts.append(where_map)
     return " – ".join(parts)
-
-
-def coins(n):
-    n = float(n or 0)
-    for size, unit in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "k")):
-        if abs(n) >= size:
-            v = n / size
-            return f"{v:.2f}".rstrip("0").rstrip(".") + unit if v < 100 else f"{v:.0f}{unit}"
-    return f"{n:.0f}"
-
-
-def networth(uuids):
-    """Skyblock networth via networth.js (SkyHelper-Networth): {uuid: result}, {} if it fails."""
-    try:
-        r = subprocess.run(["node", str(STATE.parent / "networth.js"), *uuids], capture_output=True,
-                           text=True, timeout=180, cwd=STATE.parent)
-        return json.loads(r.stdout or "{}")
-    except Exception as e:
-        print(f"networth failed: {e!r}")
-        return {}
-
-
-def rat_check(name, uuid, p, now):
-    """RAT alarm: the networth of the same profile dropped fast (items or coins gone).
-    Compares the newest value with the highest of the last RAT_MINUTES minutes; returns the alarm
-    card or None. The bank is left out: it is shared in a coop, so anyone in it could empty it.
-    Keeps the readings in p["nwHist"] as [time, networth without bank, profile, types, networth]."""
-    nw = p.get("nw") or {}
-    if nw.get("error") or nw.get("networth") is None:
-        return None
-    window = int(os.environ.get("RAT_MINUTES") or 30) * 60
-    pct = float(os.environ.get("RAT_DROP_PERCENT") or 25) / 100
-    least = float(os.environ.get("RAT_MIN_COINS") or 100_000_000)
-    hist = [h for h in p.get("nwHist") or [] if now - h[0] <= window]
-    cur = [now, nw["networth"] - (nw.get("bank") or 0), nw.get("profile"), nw.get("types") or {}, nw["networth"]]
-    card = None
-    if nw.get("noInventory"):
-        # without the inventory API only purse and bank count: no comparison possible
-        p["nwHist"] = []
-        return None
-    same = [h for h in hist if h[2] == cur[2]]
-    peak = max(same, key=lambda h: h[1]) if same else None
-    if peak and now - p.get("ratAt", 0) >= window:
-        drop = peak[1] - cur[1]
-        if drop >= least and drop >= pct * peak[1]:
-            losses = sorted(((cur[3].get(k, 0) - v, k) for k, v in peak[3].items()), key=lambda x: x[0])
-            lost = "\n".join(f"{k.replace('_', ' ').title()}: −{coins(-d)}" for d, k in losses[:4] if d < 0)
-            mins = max(1, round((now - peak[0]) / 60))
-            card = embed(name, uuid, f"🚨 RAT ALARM – {name}", RED, [
-                ("Networth", f"{coins(peak[4])} → **{coins(cur[4])}**"),
-                ("Lost", f"**−{coins(drop)}** (−{drop / peak[1] * 100:.0f}%) in {mins} min"),
-                ("Profile", cur[2]),
-                ("Biggest losses", lost or None)])
-            card["description"] = ("The networth dropped fast. If this was not you: change your Microsoft "
-                                   "password, log out all sessions and check for unknown mods.")
-            p["ratAt"] = now
-            hist = []
-    p["nwHist"] = hist + [cur]
-    return card
 
 
 def code_check(name, old, st, now_ms):
@@ -300,21 +248,6 @@ def code_check(name, old, st, now_ms):
     return card
 
 
-def nw_text(nw):
-    """The short networth summary on the live card."""
-    if not nw:
-        return None
-    if nw.get("error"):
-        return "n/a"
-    text = f"**{coins(nw.get('networth'))}**" + (f" · {nw['profile']}" if nw.get("profile") else "")
-    text += f"\nPurse {coins(nw.get('purse'))} · Bank {coins(nw.get('bank'))}"
-    if nw.get("noInventory"):
-        text += "\n⚠️ inventory API off"
-    elif nw.get("top"):
-        text += f"\nTop: {nw['top'][0].replace('_', ' ').title()} {coins(nw['top'][1])}"
-    return text
-
-
 def embed(name, uuid, title, color, fields):
     return {
         "title": title,
@@ -327,39 +260,39 @@ def embed(name, uuid, title, color, fields):
 
 
 def check(name, old, key, overview=False):
-    """Neuer Stand eines Spielers und das Embed dazu (None, wenn sich nichts getan hat)."""
-    uuid = old.get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
-    auth = {"API-Key": key}
-    session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", auth).get("session") or {}
+    """New state of a player and the card for it (None when nothing happened).
+    One Hypixel request: the status. Login and logout times are when the bot saw the player come
+    online and go offline (at most a minute late), so the player endpoint is never needed."""
+    uuid, shown = old.get("uuid"), old.get("shown")
+    if not uuid:
+        profile = get(f"https://api.mojang.com/users/profiles/minecraft/{name}")
+        uuid, shown = profile["id"], profile.get("name")
+    shown = shown or name
+    session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
     pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on every card
     online = bool(session.get("online"))
-    # The login times (player endpoint) only when something changed, or every few minutes while
-    # online (a second login: RATTER check) and once an hour while offline - the key has a daily limit.
-    every = (180 if online else 3600) * (3 if thrifty() else 1)
-    if (overview or "online" not in old or online != old.get("online") or old.get("miss")
-            or pulled - old.get("playerAt", 0) >= every * 1000):
-        player = get(f"https://api.hypixel.net/v2/player?uuid={uuid}", auth).get("player") or {}
-        player_at = pulled
-    else:
-        player = {"lastLogin": old.get("lastLogin"), "lastLogout": old.get("lastLogout"),
-                  "displayname": old.get("shown")}
-        player_at = old.get("playerAt", 0)
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
-    last_in, last_out = player.get("lastLogin"), player.get("lastLogout")
-    # Switching lobbies or servers can show a player offline for a moment. Only a new logout
-    # time, or being offline 3 rounds in a row (when the API hides the times), counts as leaving;
-    # until then they stay online - no leave card, and no second join ping afterwards.
-    miss = 0
-    if not online and old.get("online") and not overview:
+    first = "online" not in old
+    was = bool(old.get("online"))
+    last_in, last_out = old.get("lastLogin"), old.get("lastLogout")
+
+    # Switching lobbies or servers can show a player offline for a moment: only OFF_ROUNDS rounds
+    # in a row offline count as leaving (the logout is the first of them). Until then they stay
+    # online - no leave card, and no second join ping afterwards.
+    miss, off_at = 0, None
+    if not online and was and not overview:
         miss = old.get("miss", 0) + 1
-        new_logout = last_out and last_out != old.get("lastLogout") and (not last_in or last_out >= last_in)
-        if not new_logout and miss < 3:
+        off_at = old.get("offAt") or pulled
+        if miss < OFF_ROUNDS:
             online, where = True, old.get("where") or ""
-            print(f"{name}: offline for a moment ({miss}/3), still counted as online")
+            print(f"{name}: offline for a moment ({miss}/{OFF_ROUNDS}), still counted as online")
         else:
-            miss = 0
-    shown = player.get("displayname") or name
-    on = server(session) or old.get("server") if online else None  # kept during a lobby switch
+            last_out, miss, off_at = off_at, 0, None
+    elif online and old.get("miss"):
+        print(f"{name}: back online after {old['miss']} round(s), same session")
+    if online and (first or not was):
+        last_in = pulled  # a new login, seen now
+    on = (server(session) or old.get("server")) if online else None  # kept during a lobby switch
 
     login = ts(last_in) + " (" + ts(last_in, "R") + ")" if last_in else None
     logout = ts(last_out) + " (" + ts(last_out, "R") + ")" if last_out else None
@@ -367,65 +300,53 @@ def check(name, old, key, overview=False):
 
     msg = None
     ping = False
-    if overview or "online" not in old:
+    if overview or first:
         # overview cards in the same colours as the join / leave cards: green online, red offline
-        if overview and "online" in old:
+        if overview and not first:
             title = f"🟢 {shown} is online" if online else f"🔴 {shown} is offline"
             color = GREEN if online else RED
         else:
             title, color = f"👀 Now watching {shown}", BLUE
         msg = embed(shown, uuid, title, color,
                     [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
-                     ("Last login", login), ("Last logout", logout)])
-    elif online and not old["online"]:
-        # a ping once per login: not again for the same session (last login unchanged)
-        ping = not (last_in and last_in == old.get("pinged"))
-        msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN,
-                    [("Mode", where or "?"), ("Since", login)])
-    elif not online and (old["online"] or last_in != old.get("lastLogin")):
+                     ("Online since" if online else "Last login", login),
+                     ("Last logout", None if online else logout)])
+    elif online and not was:
+        # a ping once per login
+        ping = last_in != old.get("pinged")
+        msg = embed(shown, uuid, f"🟢 {shown} is online", GREEN, [("Mode", where or "?"), ("Since", login)])
+    elif not online and was:
         msg = embed(shown, uuid, f"🔴 {shown} was online", RED,
                     [("Login", login), ("Logout", logout), ("Played", played)])
     # a server or mode change sends nothing: it only shows on the live card
 
-    if "online" in old:
-        now = int(time.time() * 1000)
-        was = old["online"]
-        relogged = online and was and last_in and old.get("lastLogin") and last_in != old["lastLogin"]
-        # a whole session between two checks (after an earlier one ended, if they were online)
-        between = not online and last_in and old.get("lastLogin") and last_in != old["lastLogin"]
-        if (not online and was) or relogged or between:
-            if between and was:
-                EVENTS.append((last_in - 1, shown, "leave", "", ""))
-            if between:
-                EVENTS.append((last_in, shown, "join", "", ""))
-            end = last_out if last_out and last_in and last_out >= last_in else now
-            EVENTS.append((end, shown, "leave", "", played or ""))
-        if (online and not was) or relogged:
-            EVENTS.append((last_in or now, shown, "join", where, ""))
+    if not first and not overview:
+        if online and not was:
+            EVENTS.append((last_in, shown, "join", where, ""))
+        elif not online and was:
+            EVENTS.append((last_out, shown, "leave", "", played or ""))
 
+    total, counted = playtime(old, last_in, last_out, shown)
     status = embed(shown, uuid, f"🟢 {shown} is online" if online else f"🔴 {shown} is offline",
                    GREEN if online else RED,
                    [("Status", "🟢 online" if online else "⚫ offline"), ("Server", on),
-                    ("Last login", login), ("Last logout", logout), ("Networth", nw_text(old.get("nw")))])
-    total, counted = playtime(old, online, last_in, last_out, pulled, shown)
+                    ("Online since" if online else "Last login", login),
+                    ("Last logout", None if online else logout)])
     # the live card: the total including the session going on right now
     running = pulled - last_in if online and last_in and last_in != counted else 0
     status["fields"].append({"name": "Total played", "value": span(total + running) + " since tracking began",
                              "inline": False})
     LIVE[name] = status
-    LAST[name] = status
     for card in (msg, status):
         if card:
             card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
                                    "inline": False})
-    state = {"uuid": uuid, "online": online, "where": where if online else None,
-             "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2, "server": on, "nw": old.get("nw"), "nwHist": old.get("nwHist"), "pinged": last_in if ping else old.get("pinged"),
-             "shown": shown, "playerAt": player_at, "statusAt": pulled, "nwAt": old.get("nwAt", 0)}
+    state = {"uuid": uuid, "shown": shown, "online": online, "where": where if online else None,
+             "server": on, "lastLogin": last_in, "lastLogout": last_out, "total": total,
+             "counted": counted, "v": 2, "pinged": last_in if ping else old.get("pinged"),
+             "statusAt": pulled}
     if miss:
-        state["miss"] = miss
-    if old.get("ratAt"):
-        state["ratAt"] = old["ratAt"]
+        state.update({"miss": miss, "offAt": off_at})
     return state, msg, ping
 
 
@@ -445,12 +366,21 @@ def write_log():
     EVENTS.clear()
 
 
+def alarm(webhook, title, card, uid, text):
+    """An alarm card, then the player pinged several times."""
+    send(webhook, {"content": f"🚨🚨🚨 **{title}** 🚨🚨🚨", "embeds": [card]})
+    for i in range(int(os.environ.get("RAT_PINGS") or 3)):
+        if uid:
+            send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
+
+
 def main():
     EVENTS.clear()
     LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
     overview = os.environ.get("OVERVIEW", "").lower() == "true"
+    watching = os.environ.get("LOOP", "").lower() == "true"
     names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
     if not webhook or not key:
         print("DISCORD_WEBHOOK oder HYPIXEL_KEY fehlt (Repo-Secrets)")
@@ -460,8 +390,6 @@ def main():
         REQ.update(saved.get("req", {}))
     # a copy: comparing the new state with a dict changed in place would never see a change
     players = json.loads(json.dumps(saved.get("players", {})))
-    if "name" in saved:  # Stand aus der Version für einen Spieler übernehmen
-        players[saved["name"]] = {k: v for k, v in saved.items() if k not in ("name", "checked")}
 
     # Discord user IDs to ping, e.g. "mrkioko=123456789012345678, Knuffiman=..."
     ids = {}
@@ -471,41 +399,11 @@ def main():
             v = "".join(c for c in v if c.isdigit())
             if v:
                 ids[k.strip().lower()] = v
-    rat_test = (os.environ.get("TEST_RAT") or "").strip()
-    if rat_test:
-        # a RAT alarm with the real networth, as if the two biggest categories had just been
-        # stolen 10 minutes ago; marked as a test, the saved state is left alone
-        name = next((n for n in names if n.lower() == rat_test.lower()), rat_test)
-        uuid = players.get(name, {}).get("uuid") or get(f"https://api.mojang.com/users/profiles/minecraft/{name}")["id"]
-        nw = networth([uuid]).get(uuid) or {}
-        if nw.get("error") or nw.get("networth") is None:
-            print(f"TEST_RAT: no networth for {name}: {nw.get('error')}")
-            return 1
-        now = int(time.time())
-        types = dict(nw.get("types") or {})
-        gone = sorted(types, key=lambda k: -types[k])[:2]
-        stolen = {**nw, "types": {k: (0 if k in gone else v) for k, v in types.items()},
-                  "networth": nw["networth"] - sum(types[k] for k in gone)}
-        before = [now - 600, nw["networth"] - (nw.get("bank") or 0), nw.get("profile"), types, nw["networth"]]
-        card = rat_check(name, uuid, {"nw": stolen, "nwHist": [before]}, now)
-        if not card:
-            print(f"TEST_RAT: the test drop is below the alarm limits for {name}")
-            return 1
-        card["title"] = "🧪 TEST – " + card["title"]
-        card["footer"] = {"text": f"{name} • test, nothing was lost"}
-        uid = ids.get(name.lower())
-        send(webhook, {"content": "🧪 **TEST** – 🚨🚨🚨 **RAT ALARM** 🚨🚨🚨", "embeds": [card]})
-        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
-            if uid:
-                send(webhook, {"content": f"🚨 <@{uid}> RAT ALARM – check your account now! (test)",
-                               "allowed_mentions": {"parse": [], "users": [uid]}})
-        print(f"TEST_RAT sent for {name}" + ("" if uid else " (no Discord ID, no pings)"))
-        return 0
     test = (os.environ.get("TEST_PING") or "").strip()
     if test:
         # "all" or names separated by commas: the real card with live data for each, as if the
-        # player had just joined (offline: "was online"), each with its ping under it; the saved
-        # state is left alone
+        # player had just joined (offline: their status card), each with its ping under it; the
+        # saved state is left alone
         wanted = names if test.lower() == "all" else [t.strip() for t in test.split(",") if t.strip()]
         joined = []
         for t in wanted:
@@ -514,58 +412,33 @@ def main():
             if not uid:
                 print(f"TEST_PING: no Discord ID for {name}")
                 continue
-            _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key)
-            if card is None:  # offline and login times hidden in the API: the status card instead
-                _, card, _ = check(name, {"uuid": players.get(name, {}).get("uuid"), "online": False}, key, True)
+            old = {k: v for k, v in players.get(name, {}).items() if k in ("uuid", "shown", "lastLogin", "lastLogout")}
+            try:
+                _, card, _ = check(name, {**old, "online": False}, key)
+                if card is None:  # offline: the status card instead
+                    _, card, _ = check(name, {**old, "online": False}, key, True)
+            except (Denied, Throttled) as e:
+                print(f"TEST_PING: {name}: {e}")
+                continue
             card["footer"] = {"text": f"{card['footer']['text']} • test"}
             joined.append((card, uid))
+        EVENTS.clear()
         post(webhook, [], joined)
         print(f"test pings sent: {len(joined)}")
         return 0 if joined else 1
-    embeds, joined, errors = [], [], 0
-    # only joins and leaves send a message
-    now = int(time.time())
-    # networth every 5 minutes (only the watching run), kept in state.json
-    nw_at = saved.get("nwAt", 0)
-    rats, ratters = [], []
-    slow = 3 if thrifty() else 1
-    due = [n for n in names if players.get(n, {}).get("uuid")
-           and now - players[n].get("nwAt", 0) >= (290 if players[n].get("online") else 3590) * slow]
-    if os.environ.get("LOOP", "").lower() == "true" and due and time.time() >= PAUSE[0]:
-        uuids = {players[n]["uuid"]: n for n in due}
-        count(2 * len(uuids))  # profiles + museum
-        result = networth(list(uuids)) if uuids else {}
-        for uuid, n in uuids.items():
-            if uuid in result:
-                players[n]["nw"] = result[uuid]
-                players[n]["nwAt"] = now
-                if result[uuid].get("error"):
-                    print(f"{n}: networth: {result[uuid]['error']}")
-                    if "429" in result[uuid]["error"]:
-                        PAUSE[0] = max(PAUSE[0], time.time() + 120)
-        if result:
-            nw_at = now
-            for uuid, n in uuids.items():
-                if uuid in result:
-                    card = rat_check(n, uuid, players[n], now)
-                    if card:
-                        rats.append((card, ids.get(n.lower())))
-                        print(f"{n}: RAT ALARM")
+
+    embeds, joined, ratters, errors = [], [], [], 0
     for name in names:
         old = players.get(name, {})
-        wait = 120 * (3 if thrifty() else 1)  # offline: status every 2 minutes (6 when thrifty)
-        if (os.environ.get("LOOP", "").lower() == "true" and not overview and old.get("online") is False
-                and name in LAST and time.time() * 1000 - old.get("statusAt", 0) < wait * 1000):
-            LIVE[name] = LAST[name]
-            continue
         try:
             players[name], msg, ping = check(name, old, key, overview)
-        except urllib.error.HTTPError as e:
-            print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
+        except (Denied, Throttled, urllib.error.HTTPError) as e:
+            why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else str(e)
+            print(f"{name}: not checked: {why}")
             errors += 1
-            continue
-        except Throttled:
-            errors += 1
+            # the live card says why, instead of showing an old status as if it were current
+            LIVE[name] = embed(old.get("shown") or name, old.get("uuid") or "", f"⚠️ {old.get('shown') or name}",
+                               GREY, [("Status", f"not visible: {why}")])
             continue
         if msg:
             # only when the player has just come online - not again while they stay online
@@ -576,32 +449,21 @@ def main():
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
-        if os.environ.get("LOOP", "").lower() == "true":
-            alarm = code_check(name, old, players[name], int(time.time() * 1000))
-            if alarm:
-                ratters.append((alarm, ids.get(name.lower())))
+        if watching:
+            card = code_check(name, old, players[name], int(time.time() * 1000))
+            if card:
+                ratters.append((card, ids.get(name.lower())))
                 print(f"{name}: RATTER ALARM (no join code)")
+    for card, uid in ratters:
+        alarm(webhook, "RATTER ALARM", card, uid, "RATTER ALARM – someone else may be on your account!")
     # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
     # the bottom again
-    for card, uid in ratters:
-        send(webhook, {"content": "🚨🚨🚨 **RATTER ALARM** 🚨🚨🚨", "embeds": [card]})
-        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
-            if uid:
-                send(webhook, {"content": f"🚨 <@{uid}> RATTER ALARM – someone else may be on your account!",
-                               "allowed_mentions": {"parse": [], "users": [uid]}})
-    for card, uid in rats:
-        # the alarm card, then the player pinged several times
-        send(webhook, {"content": "🚨🚨🚨 **RAT ALARM** 🚨🚨🚨", "embeds": [card]})
-        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
-            if uid:
-                send(webhook, {"content": f"🚨 <@{uid}> RAT ALARM – check your account now!",
-                               "allowed_mentions": {"parse": [], "users": [uid]}})
-    moved = bool(embeds or joined or rats or ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
-    if moved:
+    moved = bool(embeds or joined or ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
+    if embeds or joined:
         post(webhook, embeds, joined)
     write_log()
     live_id = saved.get("live")
-    if os.environ.get("LOOP", "").lower() == "true":  # only the watching run keeps the live message
+    if watching:  # only the watching run keeps the live message
         order = {n: LIVE[n] for n in names if n in LIVE}  # always in the order of PLAYERS
         LIVE.clear()
         LIVE.update(order)
@@ -611,13 +473,13 @@ def main():
             print(f"live message failed: {e!r}")
     LIVE.clear()
 
+    if not watching:
+        return 2 if errors == len(names) else 0  # manual runs only report, the state stays as it is
     new = {"players": {n: players[n] for n in names if n in players}}
     hour = int(time.time()) // 3600
     new["req"] = {k: v for k, v in sorted(REQ.items()) if hour - int(k) < 25}
     if live_id:
         new["live"] = live_id
-    if nw_at:
-        new["nwAt"] = nw_at
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     if time.time() < PAUSE[0]:
@@ -731,7 +593,7 @@ def loop(minutes, every):
                 print(f"test overview failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
-            print(f"Hypixel requests in the last 24 h: {today()}" + (" (thrifty)" if thrifty() else ""))
+            print(f"Hypixel requests in the last 24 h: {today()}")
             save(True)  # a pull needs a clean tree
             git("pull", "-q", "--rebase")
             if blobs() != code:

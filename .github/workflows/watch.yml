@@ -17,10 +17,6 @@ on:
         description: "Only send test pings: a player, several (comma) or all"
         type: string
         default: ""
-      test_rat:
-        description: "Only send a test RAT alarm for this player"
-        type: string
-        default: ""
       loop:
         description: "Keep watching (started by the watch itself, leave off)"
         type: boolean
@@ -41,9 +37,6 @@ jobs:
     timeout-minutes: 355
     steps:
       - uses: actions/checkout@v5
-      - name: Install networth calculator
-        # SkyHelper-Networth, exact version from package-lock.json; the bot runs without it if this fails
-        run: npm ci --ignore-scripts --no-audit --no-fund || true
       - name: Check
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
@@ -54,19 +47,12 @@ jobs:
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
           OVERVIEW: ${{ inputs.overview }}
           TEST_PING: ${{ inputs.test_ping }}
-          TEST_RAT: ${{ inputs.test_rat }}
           # manual runs only report; the watching run is the only one that saves the state
           LOOP: ${{ github.event_name == 'schedule' || inputs.loop }}
           GITHUB_TOKEN: ${{ github.token }}
           # test: overview card of all players every N minutes; 0 = off
           OVERVIEW_EVERY: 0
-          # RAT alarm: networth (without the shared bank) of the same profile drops at least
-          # RAT_DROP_PERCENT % and RAT_MIN_COINS within RAT_MINUTES -> alarm card + RAT_PINGS pings
-          RAT_DROP_PERCENT: 25
-          RAT_MIN_COINS: 100000000
-          RAT_MINUTES: 30
+          # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
           RAT_PINGS: 3
-          # the Hypixel developer key has a daily limit: above this many requests in 24 h the
-          # bot asks three times less often
-          HYPIXEL_DAILY_BUDGET: 3000
+          HB_WAIT: 180
         run: python3 -u watch.py
