@@ -110,15 +110,18 @@ def setup(players):
 def upload(jar, players):
     """The jar goes only into the hidden channel: it holds the webhook and the keys."""
     boundary = uuidlib.uuid4().hex
+    # the Minecraft version is in the jar's name: onlinewatch-1.1.0+mc26.1.2.jar
+    stem = Path(jar).stem
+    mc = stem.split("+mc")[-1] if "+mc" in stem else "26.2"
     payload = json.dumps({"username": "Online Watch", "content":
-                          f"🧩 **Online Watch mod** (Minecraft 26.2, Fabric) – for {', '.join(players)}\n"
+                          f"🧩 **Online Watch mod** (Minecraft {mc}, Fabric) – for {', '.join(players)}\n"
                           "One mod for all these accounts: put it into your `mods` folder (Fabric API is "
                           "needed too) and play with any of them. Replace older Online Watch jars. "
                           "Do not share it outside this channel."})
     data = (f"--{boundary}\r\nContent-Disposition: form-data; name=\"payload_json\"\r\n"
             f"Content-Type: application/json\r\n\r\n{payload}\r\n"
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"files[0]\"; "
-            f"filename=\"onlinewatch.jar\"\r\nContent-Type: application/java-archive\r\n\r\n").encode()
+            f"filename=\"onlinewatch-mc{mc}.jar\"\r\nContent-Type: application/java-archive\r\n\r\n").encode()
     data += Path(jar).read_bytes() + f"\r\n--{boundary}--\r\n".encode()
     request(hook(), data, "POST", {"Content-Type": f"multipart/form-data; boundary={boundary}"})
     print("mod sent into the hidden channel")

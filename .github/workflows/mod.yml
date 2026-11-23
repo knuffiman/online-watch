@@ -12,6 +12,11 @@ on:
         description: "Accounts the mod is for, comma separated (empty: the watched players)"
         type: string
         default: ""
+      minecraft:
+        description: "Minecraft version"
+        type: choice
+        options: ["26.2", "26.1.2"]
+        default: "26.2"
 
 permissions:
   contents: write
@@ -43,12 +48,20 @@ jobs:
           fi
       - name: Build
         working-directory: mod
-        run: ./gradlew build --no-daemon -q
+        env:
+          MC: ${{ inputs.minecraft }}
+        run: |
+          # Fabric API for each Minecraft version
+          case "$MC" in
+            26.1.2) API=0.155.3+26.1.2 ;;
+            *) MC=26.2; API=0.161.0+26.2 ;;
+          esac
+          ./gradlew build --no-daemon -q -Pminecraft_version=$MC -Pfabric_api_version=$API
       - name: Send the jar into the hidden channel
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
           PLAYERS: ${{ inputs.players || vars.PLAYERS }}
         run: |
-          python3 heartbeat.py upload mod/build/libs/onlinewatch-1.1.0.jar
+          python3 heartbeat.py upload mod/build/libs/onlinewatch-*.jar
           rm -f mod/src/main/resources/onlinewatch.properties
