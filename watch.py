@@ -30,10 +30,34 @@ UA = {"User-Agent": "online-watch/1.1"}
 GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
+PAUSE = [0]  # Hypixel said "too many requests": no Hypixel requests until then (time.time())
+
+
+class Throttled(Exception):
+    pass
+
+
 def get(url, headers=None):
+    if "hypixel.net" in url and time.time() < PAUSE[0]:
+        raise Throttled(f"paused for {PAUSE[0] - time.time():.0f} s more")
     req = urllib.request.Request(url, headers={**UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 429 and "hypixel.net" in url:
+            h = e.headers
+            try:
+                body = e.read().decode("utf-8", "replace")[:200]
+            except Exception:
+                body = ""
+            wait = int(h.get("Retry-After") or h.get("RateLimit-Reset") or 60)
+            PAUSE[0] = time.time() + max(30, min(wait, 600))
+            print(f"Hypixel HTTP 429 ({url.split('?')[0].split('/v2/')[-1]}): limit {h.get('RateLimit-Limit')}, "
+                  f"left {h.get('RateLimit-Remaining')}, reset in {h.get('RateLimit-Reset')} s, "
+                  f"retry-after {h.get('Retry-After')}; {body} -> pausing {PAUSE[0] - time.time():.0f} s")
+            raise Throttled("429") from None
+        raise
 
 
 def send(webhook, payload, method="POST", url=None):
@@ -470,7 +494,7 @@ def main():
     # networth every 5 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
     rats, ratters = [], []
-    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290:
+    if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290 and time.time() >= PAUSE[0]:
         uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
         result = networth(list(uuids)) if uuids else {}
         for uuid, n in uuids.items():
@@ -478,6 +502,8 @@ def main():
                 players[n]["nw"] = result[uuid]
                 if result[uuid].get("error"):
                     print(f"{n}: networth: {result[uuid]['error']}")
+                    if "429" in result[uuid]["error"]:
+                        PAUSE[0] = max(PAUSE[0], time.time() + 120)
         if result:
             nw_at = now
             for uuid, n in uuids.items():
@@ -492,6 +518,9 @@ def main():
             players[name], msg, ping = check(name, old, key, overview)
         except urllib.error.HTTPError as e:
             print(f"{name}: HTTP {e.code} bei {e.url.split('?')[0]}")
+            errors += 1
+            continue
+        except Throttled:
             errors += 1
             continue
         if msg:
@@ -545,6 +574,8 @@ def main():
         new["nwAt"] = nw_at
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
+    if time.time() < PAUSE[0]:
+        print(f"Hypixel requests paused for {PAUSE[0] - time.time():.0f} s (too many requests)")
     return 2 if errors == len(names) else 0
 
 
