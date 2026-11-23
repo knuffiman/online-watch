@@ -124,10 +124,12 @@ def read_codes(player, uuid):
         return {"join": None, "leave": None}
     entries = []
     gone = None
+    in_shared = False
     try:
         entry = next((v for k, v in shared().items() if k.lower() == player.lower()), None)
         if isinstance(entry, dict):
             entries.append(entry)
+            in_shared = True
     except MessageGone as e:
         gone = e
     # an older jar still writes the player's own message
@@ -139,6 +141,10 @@ def read_codes(player, uuid):
         except urllib.error.HTTPError as e:
             if e.code != 404:
                 raise
+            if not in_shared:
+                # never used the new jar, and the old jar's message is deleted: whatever jar is
+                # played writes nowhere - a setup problem (install the new jar), not a stolen account
+                gone = gone or MessageGone(legacy)
     joins = [t for t in (valid(player, uuid, e.get("join")) for e in entries) if t]
     leaves = [t for t in (valid(player, uuid, e.get("leave"), "leave") for e in entries) if t]
     if gone and not joins and not leaves:

@@ -143,6 +143,8 @@ def mod_status(st):
     """The line about the mod's join code for the current login, or None (no mod / offline)."""
     if st.get("hbGone") and st["hbGone"] == heartbeat.message_id(st.get("shown") or ""):
         return "⚠️ code message deleted – run Build mod and install the new jar"
+    if st.get("hbGone") and st["hbGone"] in heartbeat.ids().get("legacy", {}).values():
+        return "⚠️ old mod, its code message is deleted – install the new jar from the mod message"
     if st.get("hbWait"):
         return f"⏳ waiting for the code (max {int(os.environ.get('HB_WAIT') or 180) // 60} min)"
     if st.get("hbFail") and st.get("hbFail") == st.get("lastLogin"):
