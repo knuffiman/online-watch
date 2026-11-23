@@ -103,10 +103,12 @@ def logged(shown):
 def playtime(old, online, last_in, last_out, now, shown):
     """Total playtime since tracking began, kept in state.json: each finished session
     (logout - login) counts once; when the API hides the times, every minute seen online counts."""
-    if "total" in old:
+    if "total" in old and old.get("v") == 2:
         total, counted = old["total"], old.get("counted")
-    else:  # first time: what sessions.csv already has; the session behind the current times is in it
-        total, counted = logged(shown), last_in
+    else:  # first time: what sessions.csv already has; the session behind the current times is in
+        # it only if an earlier round saw it (otherwise it is logged this round and counted below)
+        total = logged(shown)
+        counted = last_in if last_in == old.get("lastLogin") else None
     if last_in and last_out and last_out >= last_in and last_in != counted:
         total += last_out - last_in
         counted = last_in
@@ -196,7 +198,8 @@ def check(name, old, key, overview=False):
             card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
-             "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted}
+             "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
+             "v": 2}
     return state, msg, ping
 
 
