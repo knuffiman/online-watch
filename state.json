@@ -9,6 +9,7 @@
       "total": 0,
       "counted": null,
       "v": 2,
+      "server": null,
       "pinged": null
     },
     "Knuffiman": {
@@ -20,6 +21,7 @@
       "total": 9000000,
       "counted": 1795408033007,
       "v": 2,
+      "server": null,
       "pinged": null
     },
     "_gggaming": {
@@ -31,6 +33,7 @@
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
+      "server": null,
       "pinged": null
     }
   },
