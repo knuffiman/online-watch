@@ -11,7 +11,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -211,7 +211,8 @@
           4476388599.115835
         ]
       ],
-      "pinged": null
+      "pinged": null,
+      "nwAt": 1795451503
     },
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
@@ -224,7 +225,7 @@
       "v": 2,
       "server": null,
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -424,7 +425,8 @@
           46538842785.70653
         ]
       ],
-      "pinged": null
+      "pinged": null,
+      "nwAt": 1795451503
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
@@ -437,7 +439,7 @@
       "v": 2,
       "server": "Skyblock \u2013 Private Island",
       "nw": {
-        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 22169 s, retry-after 22169; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
+        "error": "HTTP 429 for skyblock/profiles (limit 300, left 0, reset 21553 s, retry-after 21553; {\"success\":false,\"cause\":\"Daily developer key throttle\",\"throttle\":true})"
       },
       "nwHist": [
         [
@@ -610,9 +612,13 @@
         ]
       ],
       "pinged": 1795425458178,
-      "ratAt": 1795440307
+      "ratAt": 1795440307,
+      "nwAt": 1795451503
     }
   },
+  "req": {
+    "498736": 7
+  },
   "live": "1574415523708666009",
-  "nwAt": 1795450888
+  "nwAt": 1795451503
 }
