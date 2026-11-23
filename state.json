@@ -26,15 +26,15 @@
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
-      "online": false,
-      "where": null,
-      "lastLogin": 1795418873441,
+      "online": true,
+      "where": "Prototype / Lobby",
+      "lastLogin": 1795425458178,
       "lastLogout": 1795419046045,
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
-      "server": null,
-      "pinged": null
+      "server": "Prototype \u2013 Lobby",
+      "pinged": 1795425458178
     }
   },
   "live": "1574316925746679821"
