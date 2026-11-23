@@ -22,6 +22,7 @@ STATE = Path(__file__).resolve().parent / "state.json"
 # the database: one line per join and per leave, nothing else
 LOG = Path(__file__).resolve().parent / "sessions.csv"
 EVENTS = []
+SEEN = {}  # when each player was last checked in this run (for playtime with hidden times)
 LIVE = {}  # the current status card of each player, for the pinned live message
 UA = {"User-Agent": "online-watch/1.1"}
 GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
@@ -85,6 +86,34 @@ def ts(ms, style="f"):
 def span(ms):
     m = round(ms / 60000)
     return f"{m // 60} h {m % 60} min" if m >= 60 else f"{m} min"
+
+
+def logged(shown):
+    """Playtime already in sessions.csv for a player (to start the total when it is new)."""
+    total = 0
+    if LOG.exists():
+        for line in LOG.read_text(encoding="utf-8").splitlines()[1:]:
+            parts = line.split(",")
+            if len(parts) >= 5 and parts[1].lower() == shown.lower() and parts[4]:
+                p = parts[4].replace(" min", "").split(" h ")
+                total += (int(p[0]) * 60 + int(p[1]) if len(p) == 2 else int(p[0])) * 60000
+    return total
+
+
+def playtime(old, online, last_in, last_out, now, shown):
+    """Total playtime since tracking began, kept in state.json: each finished session
+    (logout - login) counts once; when the API hides the times, every minute seen online counts."""
+    if "total" in old:
+        total, counted = old["total"], old.get("counted")
+    else:  # first time: what sessions.csv already has; the session behind the current times is in it
+        total, counted = logged(shown), last_in
+    if last_in and last_out and last_out >= last_in and last_in != counted:
+        total += last_out - last_in
+        counted = last_in
+    if not last_in and online and old.get("online") and SEEN.get(shown):
+        total += min(now - SEEN[shown], 600000)
+    SEEN[shown] = now
+    return total, counted
 
 
 def embed(name, uuid, title, color, fields):
@@ -156,13 +185,18 @@ def check(name, old, key, overview=False):
                    GREEN if online else RED,
                    [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
                     ("Last login", login), ("Last logout", logout)])
+    total, counted = playtime(old, online, last_in, last_out, pulled, shown)
+    # the live card: the total including the session going on right now
+    running = pulled - last_in if online and last_in and last_in != counted else 0
+    status["fields"].append({"name": "Total played", "value": span(total + running) + " since tracking began",
+                             "inline": False})
     LIVE[name] = status
     for card in (msg, status):
         if card:
             card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
-             "lastLogin": last_in, "lastLogout": last_out}
+             "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted}
     return state, msg, ping
 
 
@@ -311,10 +345,18 @@ def blobs():
     return git("rev-parse", "HEAD:watch.py", "HEAD:.github/workflows/watch.yml").stdout
 
 
-def save():
-    """Commits and pushes state.json / sessions.csv when they changed."""
-    if not git("status", "--porcelain", "state.json", "sessions.csv").stdout.strip():
+SAVED = [time.time()]
+
+
+def save(now=False):
+    """Commits and pushes state.json / sessions.csv: at once when a join or leave was logged,
+    otherwise at most every 10 minutes (the playtime of hidden players changes every minute)."""
+    changed = git("status", "--porcelain", "state.json", "sessions.csv").stdout
+    if not changed.strip():
         return
+    if not now and "sessions.csv" not in changed and time.time() - SAVED[0] < 600:
+        return
+    SAVED[0] = time.time()
     git("add", *[f for f in ("state.json", "sessions.csv") if (STATE.parent / f).exists()])
     git("-c", "user.name=online-watch", "-c", "user.email=online-watch@users.noreply.github.com",
         "commit", "-q", "-m", "state")
@@ -372,11 +414,13 @@ def loop(minutes, every):
                 print(f"test overview failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
+            save(True)  # a pull needs a clean tree
             git("pull", "-q", "--rebase")
             if blobs() != code:
                 print("code changed, restarting")
                 break
         time.sleep(max(1, every - (time.time() - start)))
+    save(True)
     dispatch()
     return 0
 
