@@ -22,6 +22,7 @@ STATE = Path(__file__).resolve().parent / "state.json"
 # the database: one line per join and per leave, nothing else
 LOG = Path(__file__).resolve().parent / "sessions.csv"
 EVENTS = []
+LIVE = {}  # the current status card of each player, for the pinned live message
 UA = {"User-Agent": "online-watch/1.1"}
 GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
@@ -32,11 +33,38 @@ def get(url, headers=None):
         return json.loads(r.read().decode("utf-8"))
 
 
-def send(webhook, payload):
+def send(webhook, payload, method="POST", url=None):
     payload = {"username": "Online Watch", "allowed_mentions": {"parse": []}, **payload}
-    req = urllib.request.Request(webhook, data=json.dumps(payload).encode("utf-8"), method="POST",
+    if method != "POST":
+        payload.pop("username")  # an edited message keeps its name
+    req = urllib.request.Request(url or webhook, data=json.dumps(payload).encode("utf-8"), method=method,
                                  headers={**UA, "Content-Type": "application/json"})
-    urllib.request.urlopen(req, timeout=20).close()
+    with urllib.request.urlopen(req, timeout=20) as r:
+        body = r.read()
+    return json.loads(body) if body else None
+
+
+def live(webhook, msg_id):
+    """The pinned live message: edited in place every round, so it always shows the current state.
+    If it is gone (deleted), a new one is sent; its id is kept in state.json."""
+    if not LIVE:
+        return msg_id
+    now = int(time.time())
+    payload = {"content": f"📌 **Live status** – updated every minute (last: <t:{now}:T>, <t:{now}:R>)",
+               "embeds": list(LIVE.values())[:10]}
+    base = webhook.split("?")[0]
+    if msg_id:
+        try:
+            send(webhook, payload, "PATCH", f"{base}/messages/{msg_id}")
+            return msg_id
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                raise
+            print("live message gone, sending a new one")
+    sep = "&" if "?" in webhook else "?"
+    msg = send(webhook, payload, url=f"{webhook}{sep}wait=true")
+    print(f"live message sent: {msg['id']} - pin it in Discord")
+    return msg["id"]
 
 
 def post(webhook, embeds, joined=()):
@@ -124,9 +152,15 @@ def check(name, old, key, overview=False):
         if (online and not was) or relogged:
             EVENTS.append((last_in or now, shown, "join", where, ""))
 
-    if msg:
-        msg["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
-                              "inline": False})
+    status = embed(shown, uuid, f"🟢 {shown} is online" if online else f"🔴 {shown} is offline",
+                   GREEN if online else RED,
+                   [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
+                    ("Last login", login), ("Last logout", logout)])
+    LIVE[name] = status
+    for card in (msg, status):
+        if card:
+            card["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
+                                   "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out}
     return state, msg, ping
@@ -150,6 +184,7 @@ def write_log():
 
 def main():
     EVENTS.clear()
+    LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
     overview = os.environ.get("OVERVIEW", "").lower() == "true"
@@ -226,12 +261,24 @@ def main():
     if embeds or joined:
         post(webhook, embeds, joined)
     write_log()
+    live_id = saved.get("live")
+    if os.environ.get("LOOP", "").lower() == "true":  # only the watching run keeps the live message
+        order = {n: LIVE[n] for n in names if n in LIVE}  # always in the order of PLAYERS
+        LIVE.clear()
+        LIVE.update(order)
+        try:
+            live_id = live(webhook, live_id)
+        except Exception as e:
+            print(f"live message failed: {e!r}")
+    LIVE.clear()
 
     new = {"players": {n: players[n] for n in names if n in players}}
     if pending:
         new["pending"] = pending
     if last_quiet:
         new["lastQuiet"] = last_quiet
+    if live_id:
+        new["live"] = live_id
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     return 2 if errors == len(names) else 0
