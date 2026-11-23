@@ -136,12 +136,52 @@ def live(webhook, msg_id, bottom=False):
 
 def post(webhook, embeds, joined=()):
     """The cards first (at most 10 per message); a join card goes on its own, followed by a
-    message with nothing but the player's ping right under it - embeds themselves never ping."""
+    message with nothing but the player's ping right under it - embeds themselves never ping.
+    joined: (card, Discord user id or None, player); returns {player: id of their join message},
+    so that the card can be edited later (the mod's code verified after it was sent)."""
     for i in range(0, len(embeds), 10):
         send(webhook, {"embeds": embeds[i:i + 10]})
-    for card, uid in joined:
-        send(webhook, {"embeds": [card]})
-        send(webhook, {"content": f"<@{uid}>", "allowed_mentions": {"parse": [], "users": [uid]}})
+    sent = {}
+    sep = "&" if "?" in webhook else "?"
+    for card, uid, *who in joined:
+        msg = send(webhook, {"embeds": [card]}, url=f"{webhook}{sep}wait=true")
+        if who and msg:
+            sent[who[0]] = msg.get("id")
+        if uid:
+            send(webhook, {"content": f"<@{uid}>", "allowed_mentions": {"parse": [], "users": [uid]}})
+    return sent
+
+
+MOD_FIELD = "Mod code"
+
+
+def mod_status(st):
+    """The line about the mod's join code for the current login, or None (no mod / offline)."""
+    if st.get("hbWait"):
+        return f"⏳ waiting for the code (max {int(os.environ.get('HB_WAIT') or 180) // 60} min)"
+    if st.get("hbFail") and st.get("hbFail") == st.get("lastLogin"):
+        return "❌ no code – RATTER ALARM"
+    t, login = st.get("hbLast"), st.get("lastLogin")
+    if t and login and abs(t - login) <= 180000:
+        return f"✅ verified ({ts(t, 'T')})"
+    return None
+
+
+def set_mod_field(card, text):
+    """Puts the mod-code line on a card (replacing an old one), just above "Checked"."""
+    fields = [f for f in card["fields"] if f["name"] != MOD_FIELD]
+    at = next((i for i, f in enumerate(fields) if f["name"] == "Checked"), len(fields))
+    fields.insert(at, {"name": MOD_FIELD, "value": text, "inline": False})
+    card["fields"] = fields
+    return card
+
+
+def edit_card(webhook, msg_id, card):
+    """Edits a message the bot sent before (the join card, once the code is in)."""
+    try:
+        send(webhook, {"embeds": [card]}, "PATCH", f"{webhook.split('?')[0]}/messages/{msg_id}")
+    except Exception as e:
+        print(f"could not edit the join card: {e!r}")
 
 
 def ts(ms, style="f"):
@@ -214,7 +254,7 @@ def code_check(name, old, st, now_ms):
     returns the alarm card or None."""
     if not os.environ.get("HEARTBEAT_WEBHOOK") or not any(k.lower() == name.lower() for k in heartbeat.ids()):
         return None
-    for k in ("hbWait", "hbLast"):
+    for k in ("hbWait", "hbLast", "hbFail"):
         if old.get(k):
             st[k] = old[k]
     login = st.get("lastLogin")
@@ -239,6 +279,7 @@ def code_check(name, old, st, now_ms):
     if now_ms - wait["since"] < int(os.environ.get("HB_WAIT") or 180) * 1000:
         return None
     st.pop("hbWait", None)
+    st["hbFail"] = st.get("lastLogin")  # this login had no code (shown on the cards)
     card = embed(name, st["uuid"], f"🚨 RATTER ALARM – {name}", RED, [
         ("Login", ts(ref) + " (" + ts(ref, "R") + ")"),
         ("Server", st.get("server") or ("online" if st["online"] else "already offline again"))])
@@ -440,27 +481,45 @@ def main():
             LIVE[name] = embed(old.get("shown") or name, old.get("uuid") or "", f"⚠️ {old.get('shown') or name}",
                                GREY, [("Status", f"not visible: {why}")])
             continue
-        if msg:
-            # only when the player has just come online - not again while they stay online
-            if ping and ids.get(name.lower()):
-                joined.append((msg, ids[name.lower()]))
-            else:
-                embeds.append(msg)
-            print(f"{name}: {msg['title']}")
-        else:
-            print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
+        st = players[name]
         if watching:
-            card = code_check(name, old, players[name], int(time.time() * 1000))
+            card = code_check(name, old, st, int(time.time() * 1000))
             if card:
                 ratters.append((card, ids.get(name.lower())))
                 print(f"{name}: RATTER ALARM (no join code)")
+        code = mod_status(st) if watching and st["online"] else None
+        if code:
+            set_mod_field(LIVE[name], code)
+        # the join card of this login was sent while the code was still awaited: edit it now
+        was_waiting = old.get("hbWait") or {}
+        if was_waiting.get("msg") and not st.get("hbWait") and was_waiting.get("login") == st.get("lastLogin"):
+            edit_card(webhook, was_waiting["msg"],
+                      set_mod_field(was_waiting["card"], mod_status(st) or "❌ no code – RATTER ALARM"))
+            print(f"{name}: join card edited: {mod_status(st)}")
+        if msg:
+            if code and msg["title"].startswith("🟢"):
+                set_mod_field(msg, code)
+            # only when the player has just come online - not again while they stay online;
+            # a join card still waiting for the code goes on its own, to be edited later
+            uid = ids.get(name.lower()) if ping else None
+            if uid or st.get("hbWait"):
+                joined.append((msg, uid, name))
+            else:
+                embeds.append(msg)
+            print(f"{name}: {msg['title']}" + (f" ({code})" if code else ""))
+        else:
+            print(f"{name}: {'online' if st['online'] else 'offline'}, nichts Neues")
     for card, uid in ratters:
         alarm(webhook, "RATTER ALARM", card, uid, "RATTER ALARM – someone else may be on your account!")
     # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
     # the bottom again
     moved = bool(embeds or joined or ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
     if embeds or joined:
-        post(webhook, embeds, joined)
+        for name, msg_id in post(webhook, embeds, joined).items():
+            wait = players[name].get("hbWait")
+            if wait and msg_id:  # remember the join card, to show the code once it is verified
+                card = next(c for c, _, n in joined if n == name)
+                wait.update({"msg": msg_id, "card": card})
     write_log()
     live_id = saved.get("live")
     if watching:  # only the watching run keeps the live message
