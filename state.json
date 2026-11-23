@@ -217,17 +217,55 @@
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
-      "online": false,
-      "where": null,
-      "server": null,
-      "lastLogin": 1795463213525,
+      "online": true,
+      "where": "Prototype / Lobby",
+      "server": "Prototype \u2013 Lobby",
+      "lastLogin": 1795463944421,
       "lastLogout": 1795463764516,
       "total": 10750869,
       "counted": 1795463213525,
       "v": 2,
-      "pinged": 1795463213525,
-      "statusAt": 1795463884420,
-      "hbLast": 1795463195505
+      "pinged": 1795463944421,
+      "statusAt": 1795463944421,
+      "hbLast": 1795463195505,
+      "hbWait": {
+        "since": 1795463944421,
+        "login": 1795463944421,
+        "msg": "1574514646621233216",
+        "card": {
+          "title": "\ud83d\udfe2 Knuffiman is online",
+          "color": 4437377,
+          "thumbnail": {
+            "url": "https://mc-heads.net/avatar/898089247cc1490c82daba24b47c8cb1/64"
+          },
+          "fields": [
+            {
+              "name": "Mode",
+              "value": "Prototype / Lobby",
+              "inline": true
+            },
+            {
+              "name": "Since",
+              "value": "<t:1795463944:f> (<t:1795463944:R>)",
+              "inline": true
+            },
+            {
+              "name": "Mod code",
+              "value": "\u23f3 waiting for the code (max 3 min)",
+              "inline": false
+            },
+            {
+              "name": "Checked",
+              "value": "<t:1795463944:T> (<t:1795463944:R>)",
+              "inline": false
+            }
+          ],
+          "footer": {
+            "text": "Knuffiman"
+          },
+          "timestamp": "2026-11-23T19:59:04.421352+00:00"
+        }
+      }
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
@@ -421,7 +459,7 @@
     "498736": 7,
     "498737": 7,
     "498738": 7,
-    "498739": 168
+    "498739": 171
   },
-  "live": "1574514396267290788"
+  "live": "1574514650639245325"
 }
