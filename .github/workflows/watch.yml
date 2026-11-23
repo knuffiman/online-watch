@@ -48,4 +48,6 @@ jobs:
           # manual runs only report; the watching run is the only one that saves the state
           LOOP: ${{ github.event_name == 'schedule' || inputs.loop }}
           GITHUB_TOKEN: ${{ github.token }}
+          # TEST: overview card of all players every 5 minutes; set to 0 to turn it off
+          OVERVIEW_EVERY: 5
         run: python3 -u watch.py

@@ -227,6 +227,24 @@ def main():
     return 2 if errors == len(names) else 0
 
 
+def overview_all():
+    """Test: the overview card of every player, without touching the saved state."""
+    key, webhook = os.environ.get("HYPIXEL_KEY", ""), os.environ.get("DISCORD_WEBHOOK", "")
+    names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
+    saved = json.loads(STATE.read_text(encoding="utf-8")).get("players", {}) if STATE.exists() else {}
+    cards = []
+    for name in names:
+        try:
+            _, card, _ = check(name, {"online": False, **saved.get(name, {})}, key, True)
+            cards.append(card)
+        except Exception as e:
+            print(f"{name}: overview failed: {e!r}")
+    EVENTS.clear()
+    if cards:
+        post(webhook, cards)
+        print(f"test overview sent: {len(cards)}")
+
+
 def git(*args):
     return subprocess.run(["git", *args], cwd=STATE.parent, capture_output=True, text=True)
 
@@ -278,6 +296,9 @@ def loop(minutes, every):
     6 hours a job may take, then starts the next run."""
     end = time.time() + minutes * 60
     code, synced = blobs(), time.time()
+    # test: every OVERVIEW_EVERY minutes the card of all players (0 or empty = off)
+    test_every = float(os.environ.get("OVERVIEW_EVERY") or 0) * 60
+    last_test = 0
     while time.time() < end:
         start = time.time()
         try:
@@ -286,6 +307,12 @@ def loop(minutes, every):
         except Exception as e:  # network trouble etc.: try again next round
             print(f"check failed: {e!r}")
         save()
+        if test_every and time.time() - last_test >= test_every:
+            last_test = time.time()
+            try:
+                overview_all()
+            except Exception as e:
+                print(f"test overview failed: {e!r}")
         if time.time() - synced >= 600:  # new code pushed? restart with it
             synced = time.time()
             git("pull", "-q", "--rebase")
