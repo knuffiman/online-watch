@@ -283,6 +283,30 @@ def fast_leaves():
     return found
 
 
+def join_ok(st, t):
+    """Is t (a join code's time) the code of the login the bot waits for?"""
+    wait = st.get("hbWait") or {}
+    ref = wait.get("login") or wait.get("since")
+    return bool(t and ref and t > (st.get("hbLast") or 0) and abs(t - ref) <= 180000)
+
+
+def fast_codes():
+    """Between the rounds: the players whose join code arrived while the bot waits for it, so that
+    the live card shows "verified" within seconds. Hidden channel only, never Hypixel."""
+    if not os.environ.get("HEARTBEAT_WEBHOOK") or not STATE.exists():
+        return set()
+    players = json.loads(STATE.read_text(encoding="utf-8")).get("players", {})
+    found = set()
+    for name, p in players.items():
+        if p.get("online") and p.get("hbWait") and p.get("uuid") and has_mod(name):
+            try:
+                if join_ok(p, heartbeat.read_code(name, p["uuid"])):
+                    found.add(name)
+            except Exception:  # read again in the next round
+                pass
+    return found
+
+
 def code_check(name, old, st, now_ms):
     """RATTER alarm: a new login on Hypixel needs a join code from the Online Watch mod within
     HB_WAIT seconds (only for players in heartbeat.json). Keeps hbWait / hbLast in the state and
@@ -315,7 +339,7 @@ def code_check(name, old, st, now_ms):
         t = None
         if now_ms - wait["since"] < 15 * 60000:
             return None
-    if t and t > (st.get("hbLast") or 0) and abs(t - ref) <= 180000:
+    if join_ok(st, t):
         st["hbLast"] = t
         st.pop("hbWait", None)
         print(f"{name}: join code OK")
@@ -456,11 +480,12 @@ def alarm(webhook, title, card, uid, text):
             send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
 
 
-def main(leaves=None):
+def main(leaves=None, verified=()):
     """One round: the status of every player, the RATTER check, sessions.csv, the live message.
     The only messages in the channel are the live message and RATTER alarms.
     leaves: {player: time of a leave code} from the fast check between rounds - then only those
-    players are updated (without asking Hypixel), the others keep their card from the last round."""
+    players are updated (without asking Hypixel), the others keep their card from the last round.
+    verified: players whose join code arrived between the rounds - only their mod line changes."""
     EVENTS.clear()
     LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
@@ -488,6 +513,12 @@ def main(leaves=None):
     for name in names:
         old = players.get(name, {})
         if leaves is not None and name not in leaves:
+            if name in verified and name in LAST and name in players:
+                st = players[name]
+                code_check(name, dict(st), st, int(time.time() * 1000))
+                code = mod_status(st)
+                if code:
+                    set_mod_field(LAST[name], code)
             if name in LAST:
                 LIVE[name] = LAST[name]
             continue
@@ -627,9 +658,13 @@ def loop(minutes, every):
             time.sleep(fast)
             try:
                 found = fast_leaves()
+                codes = fast_codes() - set(found)
                 if found:
                     print(f"leave code(s) between rounds: {', '.join(found)}")
-                    main(found)
+                if codes:
+                    print(f"join code(s) between rounds: {', '.join(sorted(codes))}")
+                if found or codes:
+                    main(found, codes)
                     save(True)
             except Exception as e:
                 print(f"fast check failed: {e!r}")
