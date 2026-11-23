@@ -1,16 +1,17 @@
 name: Build mod
 
-# Builds the Online Watch mod (mod/) for one player with the hidden-channel webhook, its message
-# id and the player's key built in, and sends the jar ONLY into the hidden Discord channel.
-# The jar is never uploaded to GitHub: the repo is public and the jar holds the key.
+# Builds the Online Watch mod (mod/): ONE jar for all watched accounts, with the hidden-channel
+# webhook and, per account, its message id and key built in. Whoever plays on any of these
+# accounts with it sends that account's join and leave codes. The jar goes ONLY into the hidden
+# Discord channel and is never uploaded to GitHub: the repo is public and the jar holds the keys.
 
 on:
   workflow_dispatch:
     inputs:
-      player:
-        description: "Minecraft name the mod is for"
+      players:
+        description: "Accounts the mod is for, comma separated (empty: the watched players)"
         type: string
-        default: "Knuffiman"
+        default: ""
 
 permissions:
   contents: write
@@ -25,19 +26,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-      - name: Code message and mod settings
+      - name: Code messages and mod settings
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
-          PLAYER: ${{ inputs.player }}
-        run: python3 heartbeat.py setup "$PLAYER"
+          PLAYERS: ${{ inputs.players || vars.PLAYERS }}
+        run: python3 heartbeat.py setup
       - name: Save heartbeat.json
         run: |
           if [ -n "$(git status --porcelain heartbeat.json)" ]; then
             git config user.name "online-watch"
             git config user.email "online-watch@users.noreply.github.com"
             git add heartbeat.json
-            git commit -m "heartbeat: code message for ${{ inputs.player }}"
+            git commit -m "heartbeat: code messages for the mod"
             for i in 1 2 3 4; do git pull --rebase -q && git push -q && break; sleep 5; done
           fi
       - name: Build
@@ -47,7 +48,7 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
-          PLAYER: ${{ inputs.player }}
+          PLAYERS: ${{ inputs.players || vars.PLAYERS }}
         run: |
-          python3 heartbeat.py upload "$PLAYER" mod/build/libs/onlinewatch-1.0.0.jar
+          python3 heartbeat.py upload mod/build/libs/onlinewatch-1.1.0.jar
           rm -f mod/src/main/resources/onlinewatch.properties

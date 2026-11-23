@@ -3,7 +3,7 @@
 	"id": "onlinewatch",
 	"version": "${version}",
 	"name": "Online Watch",
-	"description": "Sends one signed code when you join Hypixel, so the Online Watch bot knows it was you and not someone with your stolen login.",
+	"description": "One mod for all watched accounts: sends a signed code when joining and leaving Hypixel, so the Online Watch bot knows it was you and not someone with your stolen login, and sees a leave at once.",
 	"authors": ["online-watch"],
 	"license": "MIT",
 	"environment": "client",

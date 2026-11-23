@@ -8,8 +8,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 
@@ -24,22 +26,34 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Online Watch: once per join on Hypixel (a rejoin is a new join; switching lobbies is not) this
- * sends a signed code to a hidden Discord channel. The Online Watch bot checks every new login it
- * sees on Hypixel against it: no valid code means someone else logged in with this account.
+ * Online Watch: one mod for every watched account. Whoever plays with it, on whichever of the
+ * watched accounts, sends a signed code to that account's message in a hidden Discord channel:
+ * once per join on Hypixel (a rejoin is a new join; switching lobbies is not) and once when
+ * leaving. The Online Watch bot checks every new login it sees on Hypixel against the join code
+ * (no valid code: someone else logged in with this account) and counts a leave at once when the
+ * leave code is there.
  *
- * The webhook, message id and key are built into the jar by the GitHub workflow
- * (onlinewatch.properties); the jar is only handed out in the hidden channel.
+ * The message content is {"join": code, "leave": code or absent}: the leave keeps the join code
+ * next to it, so the bot can still check the join when it sees both in the same round.
+ *
+ * The webhook and, per account, the message id and key are built into the jar by the GitHub
+ * workflow (onlinewatch.properties); the jar is only handed out in the hidden channel.
  */
 public class OnlineWatch implements ClientModInitializer {
 	private static final Logger LOG = LoggerFactory.getLogger("onlinewatch");
 	private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 	private static final SecureRandom RANDOM = new SecureRandom();
 
+	private record Account(String message, byte[] key) {
+	}
+
 	private String webhook;
-	private String message;
-	private byte[] key;
-	private String player;
+	private final Map<String, Account> accounts = new HashMap<>();
+
+	// the account on Hypixel right now (null when not connected there) and its join code
+	private String current;
+	private String currentId;
+	private String joinCode;
 
 	@Override
 	public void onInitializeClient() {
@@ -55,16 +69,22 @@ public class OnlineWatch implements ClientModInitializer {
 			return;
 		}
 		webhook = p.getProperty("webhook", "").split("\\?")[0];
-		message = p.getProperty("message", "");
-		key = HexFormat.of().parseHex(p.getProperty("key", ""));
-		player = p.getProperty("player", "");
-		if (webhook.isEmpty() || message.isEmpty() || key.length == 0) {
+		for (String name : p.getProperty("players", "").split(",")) {
+			String n = name.trim().toLowerCase(Locale.ROOT);
+			String message = p.getProperty("message." + n, "");
+			String key = p.getProperty("key." + n, "");
+			if (!n.isEmpty() && !message.isEmpty() && !key.isEmpty()) {
+				accounts.put(n, new Account(message, HexFormat.of().parseHex(key)));
+			}
+		}
+		if (webhook.isEmpty() || accounts.isEmpty()) {
 			LOG.warn("Online Watch: settings incomplete, nothing will be sent");
 			return;
 		}
 		// JOIN fires once per connection to a server: Hypixel lobby switches stay on the same one
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> onJoin(client));
-		LOG.info("Online Watch ready for {}", player);
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> onLeave());
+		LOG.info("Online Watch ready for {} account(s)", accounts.size());
 	}
 
 	private void onJoin(Minecraft client) {
@@ -72,26 +92,53 @@ public class OnlineWatch implements ClientModInitializer {
 		if (server == null || !server.ip.toLowerCase(Locale.ROOT).contains("hypixel.net")) {
 			return;
 		}
-		UUID uuid = client.getUser().getProfileId();
 		String name = client.getUser().getName();
-		if (!player.isEmpty() && !player.equalsIgnoreCase(name)) {
-			LOG.info("Online Watch: built for {}, not sending for {}", player, name);
+		if (!accounts.containsKey(name.toLowerCase(Locale.ROOT))) {
+			LOG.info("Online Watch: {} is not one of the watched accounts, nothing sent", name);
 			return;
 		}
+		UUID uuid = client.getUser().getProfileId();
+		current = name;
+		currentId = uuid.toString().replace("-", "");
+		joinCode = code(name, currentId, null);
+		// async: joining never waits for Discord
+		sendAsync(name, "{\"join\":" + joinCode + "}", 3);
+	}
+
+	private void onLeave() {
+		String name = current;
+		if (name == null) {
+			return; // not on Hypixel with a watched account
+		}
+		current = null;
+		String body = "{\"join\":" + joinCode + ",\"leave\":" + code(name, currentId, "leave") + "}";
+		// right away and waiting for it (at most a few seconds): when the game is being closed,
+		// an async request would die with it
+		try {
+			HttpResponse<Void> res = HTTP.send(request(name, body, 5), HttpResponse.BodyHandlers.discarding());
+			if (res.statusCode() / 100 == 2) {
+				LOG.info("Online Watch: leave code sent");
+				return;
+			}
+			LOG.warn("Online Watch: leave code not sent ({})", res.statusCode());
+		} catch (Exception e) {
+			LOG.warn("Online Watch: leave code not sent ({})", e.toString());
+		}
+	}
+
+	/** A signed code: name, uuid, time, a random nonce and (for a leave) the event. */
+	private String code(String name, String id, String event) {
 		long time = System.currentTimeMillis();
 		byte[] nonce = new byte[12];
 		RANDOM.nextBytes(nonce);
 		String n = HexFormat.of().formatHex(nonce);
-		String id = uuid.toString().replace("-", "");
-		String sig = sign(name + "|" + id + "|" + time + "|" + n);
-		String code = "{\"p\":\"" + name + "\",\"u\":\"" + id + "\",\"t\":" + time + ",\"n\":\"" + n
-				+ "\",\"sig\":\"" + sig + "\"}";
-		// the code is the whole content of the message the bot reads
-		String body = "{\"content\":\"" + code.replace("\\", "\\\\").replace("\"", "\\\"") + "\"}";
-		send(body, 3);
+		String text = name + "|" + id + "|" + time + "|" + n + (event == null ? "" : "|" + event);
+		String sig = sign(accounts.get(name.toLowerCase(Locale.ROOT)).key(), text);
+		return "{\"p\":\"" + name + "\",\"u\":\"" + id + "\",\"t\":" + time + ",\"n\":\"" + n + "\""
+				+ (event == null ? "" : ",\"e\":\"" + event + "\"") + ",\"sig\":\"" + sig + "\"}";
 	}
 
-	private String sign(String text) {
+	private static String sign(byte[] key, String text) {
 		try {
 			Mac mac = Mac.getInstance("HmacSHA256");
 			mac.init(new SecretKeySpec(key, "HmacSHA256"));
@@ -101,14 +148,20 @@ public class OnlineWatch implements ClientModInitializer {
 		}
 	}
 
-	private void send(String body, int tries) {
-		HttpRequest req = HttpRequest.newBuilder(URI.create(webhook + "/messages/" + message))
-				.timeout(Duration.ofSeconds(15))
+	private HttpRequest request(String name, String content, int timeoutSeconds) {
+		// the codes are the whole content of the account's message, which the bot reads
+		String body = "{\"content\":\"" + content.replace("\\", "\\\\").replace("\"", "\\\"") + "\"}";
+		String message = accounts.get(name.toLowerCase(Locale.ROOT)).message();
+		return HttpRequest.newBuilder(URI.create(webhook + "/messages/" + message))
+				.timeout(Duration.ofSeconds(timeoutSeconds))
 				.header("Content-Type", "application/json")
-				.header("User-Agent", "online-watch-mod/1.0")
+				.header("User-Agent", "online-watch-mod/1.1")
 				.method("PATCH", HttpRequest.BodyPublishers.ofString(body))
 				.build();
-		HTTP.sendAsync(req, HttpResponse.BodyHandlers.discarding()).whenComplete((res, err) -> {
+	}
+
+	private void sendAsync(String name, String content, int tries) {
+		HTTP.sendAsync(request(name, content, 15), HttpResponse.BodyHandlers.discarding()).whenComplete((res, err) -> {
 			if (err == null && res.statusCode() / 100 == 2) {
 				LOG.info("Online Watch: join code sent");
 			} else if (tries > 1) {
@@ -118,7 +171,7 @@ public class OnlineWatch implements ClientModInitializer {
 				} catch (InterruptedException ignored) {
 					Thread.currentThread().interrupt();
 				}
-				send(body, tries - 1);
+				sendAsync(name, content, tries - 1);
 			} else {
 				LOG.warn("Online Watch: could not send the join code");
 			}

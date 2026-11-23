@@ -248,11 +248,34 @@ def server(session):
     return " – ".join(parts)
 
 
+def has_mod(name):
+    return bool(os.environ.get("HEARTBEAT_WEBHOOK")) and any(k.lower() == name.lower() for k in heartbeat.ids())
+
+
+def mod_leave(name, uuid, old, last_in):
+    """The time of a fresh leave code from the mod for this session (ms), else None.
+    Only asked when Hypixel shows a player offline who was online: one read of the hidden channel."""
+    if os.environ.get("LOOP", "").lower() != "true" or not has_mod(name):
+        return None
+    try:
+        codes = heartbeat.read_codes(name, uuid)
+    except Exception as e:  # cannot read it: the usual OFF_ROUNDS rounds decide
+        print(f"{name}: codes not readable: {e!r}")
+        return None
+    t, joined = codes.get("leave"), codes.get("join")
+    # newer than the last leave used, not older than this session (a little slack: the bot sees a
+    # login up to a minute late), and the latest event (no join after it)
+    if (t and t > (old.get("hbLeave") or 0) and (not last_in or t >= last_in - 180000)
+            and (not joined or t >= joined)):
+        return t
+    return None
+
+
 def code_check(name, old, st, now_ms):
     """RATTER alarm: a new login on Hypixel needs a join code from the Online Watch mod within
     HB_WAIT seconds (only for players in heartbeat.json). Keeps hbWait / hbLast in the state and
     returns the alarm card or None."""
-    if not os.environ.get("HEARTBEAT_WEBHOOK") or not any(k.lower() == name.lower() for k in heartbeat.ids()):
+    if not has_mod(name):
         return None
     for k in ("hbWait", "hbLast", "hbFail"):
         if old.get(k):
@@ -320,8 +343,13 @@ def check(name, old, key, overview=False):
     # Switching lobbies or servers can show a player offline for a moment: only OFF_ROUNDS rounds
     # in a row offline count as leaving (the logout is the first of them). Until then they stay
     # online - no leave card, and no second join ping afterwards.
+    # A leave code from the mod (sent when disconnecting) ends the session at once, at its time.
     miss, off_at = 0, None
-    if not online and was and not overview:
+    left = mod_leave(name, uuid, old, last_in) if not online and was and not overview else None
+    if left:
+        last_out = left
+        print(f"{name}: leave code from the mod, left at once")
+    elif not online and was and not overview:
         miss = old.get("miss", 0) + 1
         off_at = old.get("offAt") or pulled
         if miss < OFF_ROUNDS:
@@ -386,6 +414,8 @@ def check(name, old, key, overview=False):
              "server": on, "lastLogin": last_in, "lastLogout": last_out, "total": total,
              "counted": counted, "v": 2, "pinged": last_in if ping else old.get("pinged"),
              "statusAt": pulled}
+    if left or old.get("hbLeave"):
+        state["hbLeave"] = left or old["hbLeave"]
     if miss:
         state.update({"miss": miss, "offAt": off_at})
     return state, msg, ping
