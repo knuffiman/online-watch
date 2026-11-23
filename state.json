@@ -27,19 +27,19 @@
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "online": true,
-      "where": "Skyblock / Dynamic",
+      "where": "Skyblock / Rift",
       "lastLogin": 1795425458178,
       "lastLogout": 1795419046045,
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
-      "server": "Skyblock \u2013 Private Island",
+      "server": "Skyblock \u2013 The Rift",
       "pinged": 1795425458178
     }
   },
   "pending": {
     "_gggaming": {
-      "title": "\ud83d\udd01 _GGgaming is now playing Skyblock / Dynamic",
+      "title": "\ud83d\udd01 _GGgaming is now playing Skyblock / Rift",
       "color": 10070709,
       "thumbnail": {
         "url": "https://mc-heads.net/avatar/562fe7f8702045da9182379182dead73/64"
@@ -52,14 +52,14 @@
         },
         {
           "name": "Checked",
-          "value": "<t:1795425708:T> (<t:1795425708:R>)",
+          "value": "<t:1795427868:T> (<t:1795427868:R>)",
           "inline": false
         }
       ],
       "footer": {
         "text": "_GGgaming"
       },
-      "timestamp": "2026-11-23T09:21:48.577389+00:00"
+      "timestamp": "2026-11-23T09:57:48.529415+00:00"
     }
   },
   "lastQuiet": 1795425527,
