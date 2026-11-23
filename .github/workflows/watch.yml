@@ -53,4 +53,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # test: overview card of all players every N minutes; 0 = off
           OVERVIEW_EVERY: 0
+          # RAT alarm: networth (without the shared bank) of the same profile drops at least
+          # RAT_DROP_PERCENT % and RAT_MIN_COINS within RAT_MINUTES -> alarm card + RAT_PINGS pings
+          RAT_DROP_PERCENT: 25
+          RAT_MIN_COINS: 100000000
+          RAT_MINUTES: 30
+          RAT_PINGS: 3
         run: python3 -u watch.py

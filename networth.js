@@ -34,6 +34,8 @@ async function networth(uuid) {
         bank: nw.bank,
         noInventory: nw.noInventory,
         top: types[0] && types[0][1] > 0 ? types[0] : null,
+        // value per category, for the RAT alarm (what was lost)
+        types: Object.fromEntries(types.map(([k, v]) => [k, Math.round(v)])),
     };
 }
 

@@ -175,6 +175,45 @@ def networth(uuids):
         return {}
 
 
+def rat_check(name, uuid, p, now):
+    """RAT alarm: the networth of the same profile dropped fast (items or coins gone).
+    Compares the newest value with the highest of the last RAT_MINUTES minutes; returns the alarm
+    card or None. The bank is left out: it is shared in a coop, so anyone in it could empty it.
+    Keeps the readings in p["nwHist"] as [time, networth without bank, profile, types, networth]."""
+    nw = p.get("nw") or {}
+    if nw.get("error") or nw.get("networth") is None:
+        return None
+    window = int(os.environ.get("RAT_MINUTES") or 30) * 60
+    pct = float(os.environ.get("RAT_DROP_PERCENT") or 25) / 100
+    least = float(os.environ.get("RAT_MIN_COINS") or 100_000_000)
+    hist = [h for h in p.get("nwHist") or [] if now - h[0] <= window]
+    cur = [now, nw["networth"] - (nw.get("bank") or 0), nw.get("profile"), nw.get("types") or {}, nw["networth"]]
+    card = None
+    if nw.get("noInventory"):
+        # without the inventory API only purse and bank count: no comparison possible
+        p["nwHist"] = []
+        return None
+    same = [h for h in hist if h[2] == cur[2]]
+    peak = max(same, key=lambda h: h[1]) if same else None
+    if peak and now - p.get("ratAt", 0) >= window:
+        drop = peak[1] - cur[1]
+        if drop >= least and drop >= pct * peak[1]:
+            losses = sorted(((cur[3].get(k, 0) - v, k) for k, v in peak[3].items()), key=lambda x: x[0])
+            lost = "\n".join(f"{k.replace('_', ' ').title()}: −{coins(-d)}" for d, k in losses[:4] if d < 0)
+            mins = max(1, round((now - peak[0]) / 60))
+            card = embed(name, uuid, f"🚨 RAT ALARM – {name}", RED, [
+                ("Networth", f"{coins(peak[4])} → **{coins(cur[4])}**"),
+                ("Lost", f"**−{coins(drop)}** (−{drop / peak[1] * 100:.0f}%) in {mins} min"),
+                ("Profile", cur[2]),
+                ("Biggest losses", lost or None)])
+            card["description"] = ("The networth dropped fast. If this was not you: change your Microsoft "
+                                   "password, log out all sessions and check for unknown mods.")
+            p["ratAt"] = now
+            hist = []
+    p["nwHist"] = hist + [cur]
+    return card
+
+
 def nw_text(nw):
     """The short networth summary on the live card."""
     if not nw:
@@ -284,9 +323,11 @@ def check(name, old, key, overview=False):
                                    "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out, "total": total, "counted": counted,
-             "v": 2, "server": on, "nw": old.get("nw"), "pinged": last_in if ping else old.get("pinged")}
+             "v": 2, "server": on, "nw": old.get("nw"), "nwHist": old.get("nwHist"), "pinged": last_in if ping else old.get("pinged")}
     if miss:
         state["miss"] = miss
+    if old.get("ratAt"):
+        state["ratAt"] = old["ratAt"]
     return state, msg, ping
 
 
@@ -356,6 +397,7 @@ def main():
     now = int(time.time())
     # networth every 5 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
+    rats = []
     if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290:
         uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
         result = networth(list(uuids)) if uuids else {}
@@ -366,6 +408,12 @@ def main():
                     print(f"{n}: networth: {result[uuid]['error']}")
         if result:
             nw_at = now
+            for uuid, n in uuids.items():
+                if uuid in result:
+                    card = rat_check(n, uuid, players[n], now)
+                    if card:
+                        rats.append((card, ids.get(n.lower())))
+                        print(f"{n}: RAT ALARM")
     for name in names:
         old = players.get(name, {})
         try:
@@ -385,7 +433,14 @@ def main():
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
     # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
     # the bottom again
-    moved = bool(embeds or joined) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
+    for card, uid in rats:
+        # the alarm card, then the player pinged several times
+        send(webhook, {"content": "🚨🚨🚨 **RAT ALARM** 🚨🚨🚨", "embeds": [card]})
+        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
+            if uid:
+                send(webhook, {"content": f"🚨 <@{uid}> RAT ALARM – check your account now!",
+                               "allowed_mentions": {"parse": [], "users": [uid]}})
+    moved = bool(embeds or joined or rats) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
     if moved:
         post(webhook, embeds, joined)
     write_log()
