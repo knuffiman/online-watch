@@ -12,13 +12,13 @@
       "server": null,
       "nw": {
         "profile": "Tomato",
-        "networth": 4474207038.108562,
+        "networth": 4473925553.108562,
         "purse": 3699868.0723750144,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "accessories",
-          1125964792.1677577
+          1125461735.1677577
         ]
       },
       "pinged": null
@@ -35,13 +35,13 @@
       "server": null,
       "nw": {
         "profile": "Tomato",
-        "networth": 46541825791.81829,
+        "networth": 46547279808.81829,
         "purse": 3130648910.0660043,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "wardrobe",
-          10530019585.640152
+          10533686254.640152
         ]
       },
       "pinged": null
@@ -49,27 +49,27 @@
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "online": true,
-      "where": "Skyblock / Rift",
+      "where": "Skyblock / Dynamic",
       "lastLogin": 1795425458178,
       "lastLogout": 1795419046045,
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
-      "server": "Skyblock \u2013 The Rift",
+      "server": "Skyblock \u2013 Private Island",
       "nw": {
         "profile": "Tomato",
-        "networth": 31947728819.298244,
-        "purse": 261899.04100000113,
+        "networth": 31946481694.24315,
+        "purse": 261994.04100000113,
         "bank": 1000969440.2511519,
         "noInventory": false,
         "top": [
           "accessories",
-          9909274704.566248
+          9908721656.566248
         ]
       },
       "pinged": 1795425458178
     }
   },
-  "live": "1574391415683686475",
-  "nwAt": 1795434560
+  "live": "1574393986108620897",
+  "nwAt": 1795435773
 }
