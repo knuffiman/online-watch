@@ -348,7 +348,9 @@ def main():
         embeds += [pending[n] for n in names if n in pending]
         pending = {}
         last_quiet = now
-    moved = bool(embeds or joined)  # new cards: the live message goes below them again
+    # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
+    # the bottom again
+    moved = bool(embeds or joined) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
     if moved:
         post(webhook, embeds, joined)
     write_log()
@@ -461,6 +463,7 @@ def loop(minutes, every):
     6 hours a job may take, then starts the next run."""
     end = time.time() + minutes * 60
     code, synced = blobs(), time.time()
+    os.environ["LIVE_TO_BOTTOM"] = "1"
     # test: every OVERVIEW_EVERY minutes the card of all players (0 or empty = off)
     test_every = float(os.environ.get("OVERVIEW_EVERY") or 0) * 60
     last_test = 0
