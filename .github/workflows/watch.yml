@@ -48,6 +48,8 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           HYPIXEL_KEY: ${{ secrets.HYPIXEL_KEY }}
+          # hidden channel with the join codes of the Online Watch mod (RATTER alarm)
+          HEARTBEAT_WEBHOOK: ${{ secrets.HEARTBEAT_WEBHOOK }}
           PLAYERS: ${{ vars.PLAYERS }}
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
           OVERVIEW: ${{ inputs.overview }}

@@ -14,6 +14,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+import heartbeat
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -211,6 +213,46 @@ def rat_check(name, uuid, p, now):
             p["ratAt"] = now
             hist = []
     p["nwHist"] = hist + [cur]
+    return card
+
+
+def code_check(name, old, st, now_ms):
+    """RATTER alarm: a new login on Hypixel needs a join code from the Online Watch mod within
+    HB_WAIT seconds (only for players in heartbeat.json). Keeps hbWait / hbLast in the state and
+    returns the alarm card or None."""
+    if not os.environ.get("HEARTBEAT_WEBHOOK") or not any(k.lower() == name.lower() for k in heartbeat.ids()):
+        return None
+    for k in ("hbWait", "hbLast"):
+        if old.get(k):
+            st[k] = old[k]
+    login = st.get("lastLogin")
+    if st["online"] and (not old.get("online") or (login and old.get("lastLogin") and login != old["lastLogin"])):
+        st["hbWait"] = {"since": now_ms, "login": login}
+    wait = st.get("hbWait")
+    if not wait:
+        return None
+    ref = wait.get("login") or wait["since"]
+    try:
+        t = heartbeat.read_code(name, st["uuid"])
+    except Exception as e:  # cannot read the code: never an alarm for that, try again next round
+        print(f"{name}: join code not readable: {e!r}")
+        t = None
+        if now_ms - wait["since"] < 15 * 60000:
+            return None
+    if t and t > (st.get("hbLast") or 0) and abs(t - ref) <= 180000:
+        st["hbLast"] = t
+        st.pop("hbWait", None)
+        print(f"{name}: join code OK")
+        return None
+    if now_ms - wait["since"] < int(os.environ.get("HB_WAIT") or 180) * 1000:
+        return None
+    st.pop("hbWait", None)
+    card = embed(name, st["uuid"], f"🚨 RATTER ALARM – {name}", RED, [
+        ("Login", ts(ref) + " (" + ts(ref, "R") + ")"),
+        ("Server", st.get("server") or ("online" if st["online"] else "already offline again"))])
+    card["description"] = (f"**{name} joined Hypixel, but the Online Watch mod sent no code.**\n"
+                           "If that was not you on your own PC with the mod: change your Microsoft "
+                           "password now, log out all devices (account.microsoft.com) and check your mods.")
     return card
 
 
@@ -427,7 +469,7 @@ def main():
     now = int(time.time())
     # networth every 5 minutes (only the watching run), kept in state.json
     nw_at = saved.get("nwAt", 0)
-    rats = []
+    rats, ratters = [], []
     if os.environ.get("LOOP", "").lower() == "true" and now - nw_at >= 290:
         uuids = {players[n]["uuid"]: n for n in names if players.get(n, {}).get("uuid")}
         result = networth(list(uuids)) if uuids else {}
@@ -461,8 +503,19 @@ def main():
             print(f"{name}: {msg['title']}")
         else:
             print(f"{name}: {'online' if players[name]['online'] else 'offline'}, nichts Neues")
+        if os.environ.get("LOOP", "").lower() == "true":
+            alarm = code_check(name, old, players[name], int(time.time() * 1000))
+            if alarm:
+                ratters.append((alarm, ids.get(name.lower())))
+                print(f"{name}: RATTER ALARM (no join code)")
     # new cards, or the first round of a run (e.g. after a test ping): the live message goes to
     # the bottom again
+    for card, uid in ratters:
+        send(webhook, {"content": "🚨🚨🚨 **RATTER ALARM** 🚨🚨🚨", "embeds": [card]})
+        for i in range(int(os.environ.get("RAT_PINGS") or 3)):
+            if uid:
+                send(webhook, {"content": f"🚨 <@{uid}> RATTER ALARM – someone else may be on your account!",
+                               "allowed_mentions": {"parse": [], "users": [uid]}})
     for card, uid in rats:
         # the alarm card, then the player pinged several times
         send(webhook, {"content": "🚨🚨🚨 **RAT ALARM** 🚨🚨🚨", "embeds": [card]})
@@ -470,7 +523,7 @@ def main():
             if uid:
                 send(webhook, {"content": f"🚨 <@{uid}> RAT ALARM – check your account now!",
                                "allowed_mentions": {"parse": [], "users": [uid]}})
-    moved = bool(embeds or joined or rats) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
+    moved = bool(embeds or joined or rats or ratters) or os.environ.pop("LIVE_TO_BOTTOM", "") == "1"
     if moved:
         post(webhook, embeds, joined)
     write_log()

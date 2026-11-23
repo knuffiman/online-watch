@@ -1,0 +1,4 @@
+build/
+.gradle/
+# built in by the GitHub workflow, never committed
+src/main/resources/onlinewatch.properties
