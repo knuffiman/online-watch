@@ -76,6 +76,7 @@ def check(name, old, key, overview=False):
     auth = {"API-Key": key}
     session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", auth).get("session") or {}
     player = get(f"https://api.hypixel.net/v2/player?uuid={uuid}", auth).get("player") or {}
+    pulled = int(time.time() * 1000)  # when the data was fetched from Hypixel, shown on every card
     online = bool(session.get("online"))
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     last_in, last_out = player.get("lastLogin"), player.get("lastLogout")
@@ -123,6 +124,9 @@ def check(name, old, key, overview=False):
         if (online and not was) or relogged:
             EVENTS.append((last_in or now, shown, "join", where, ""))
 
+    if msg:
+        msg["fields"].append({"name": "Checked", "value": ts(pulled, "T") + " (" + ts(pulled, "R") + ")",
+                              "inline": False})
     state = {"uuid": uuid, "online": online, "where": where if online else None,
              "lastLogin": last_in, "lastLogout": last_out}
     return state, msg, ping
