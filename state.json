@@ -27,15 +27,16 @@
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "online": true,
-      "where": "Prototype / Lobby",
+      "where": "Skyblock / Mining 3",
       "lastLogin": 1795425458178,
       "lastLogout": 1795419046045,
       "total": 5580000,
       "counted": 1795418873441,
       "v": 2,
-      "server": "Prototype \u2013 Lobby",
+      "server": "Skyblock \u2013 Dwarven Mines",
       "pinged": 1795425458178
     }
   },
+  "lastQuiet": 1795425527,
   "live": "1574316925746679821"
 }
