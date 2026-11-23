@@ -88,7 +88,13 @@ def check(name, old, key, overview=False):
     msg = None
     ping = False
     if overview or "online" not in old:
-        msg = embed(shown, uuid, f"📋 {shown}" if overview and "online" in old else f"👀 Now watching {shown}", BLUE,
+        # overview cards in the same colours as the join / leave cards: green online, red offline
+        if overview and "online" in old:
+            title = f"🟢 {shown} is online" if online else f"🔴 {shown} is offline"
+            color = GREEN if online else RED
+        else:
+            title, color = f"👀 Now watching {shown}", BLUE
+        msg = embed(shown, uuid, title, color,
                     [("Status", "🟢 online" if online else "⚫ offline"), ("Mode", where if online else None),
                      ("Last login", login), ("Last logout", logout)])
     elif online and not old["online"]:
