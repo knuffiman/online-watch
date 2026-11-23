@@ -1,0 +1,45 @@
+name: Probe Hypixel key
+
+# Two Hypixel requests with HYPIXEL_KEY (one per given player) that print only the rate limit
+# headers and the answer's status / cause - never the key and nothing to Discord.
+
+on:
+  workflow_dispatch:
+    inputs:
+      uuids:
+        description: "Player UUIDs, comma separated"
+        type: string
+        default: "898089247cc1490c82daba24b47c8cb1,2c8d3d5f841540c0987e06d889f1bf02"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Probe
+        env:
+          HYPIXEL_KEY: ${{ secrets.HYPIXEL_KEY }}
+          UUIDS: ${{ inputs.uuids }}
+        shell: python3 {0}
+        run: |
+          import json, os, urllib.error, urllib.request
+          for uuid in [u.strip() for u in os.environ["UUIDS"].split(",") if u.strip()]:
+              req = urllib.request.Request(f"https://api.hypixel.net/v2/status?uuid={uuid}",
+                                           headers={"API-Key": os.environ["HYPIXEL_KEY"],
+                                                    "User-Agent": "online-watch/1.1"})
+              try:
+                  with urllib.request.urlopen(req, timeout=20) as r:
+                      code, h, body = r.status, r.headers, r.read().decode("utf-8", "replace")
+              except urllib.error.HTTPError as e:
+                  code, h, body = e.code, e.headers, e.read().decode("utf-8", "replace")
+              try:
+                  data = json.loads(body)
+                  answer = {k: data.get(k) for k in ("success", "cause", "throttle", "global") if k in data}
+              except ValueError:
+                  answer = body[:200]
+              print(f"{uuid}: HTTP {code} {answer}")
+              for k in ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "Retry-After"):
+                  print(f"  {k}: {h.get(k)}")
