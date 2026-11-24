@@ -136,22 +136,21 @@ def live(webhook, msg_id, bottom=False):
 
 
 
-MOD_FIELD = "Mod code"
+MOD_FIELD = "Key"
 
 
 def mod_status(st):
-    """The line about the mod's join code for the current login, or None (no mod / offline)."""
-    if st.get("hbGone") and st["hbGone"] == heartbeat.message_id(st.get("shown") or ""):
-        return "⚠️ code message deleted – run Build mod and install the new jar"
-    if st.get("hbGone") and st["hbGone"] in heartbeat.ids().get("legacy", {}).values():
-        return "⚠️ old mod, its code message is deleted – install the new jar from the mod message"
+    """Only whether the mod's key (join code) of the current login was checked, or None (no mod /
+    offline). The code itself never goes into the channel."""
+    if st.get("hbGone"):
+        return "❌ not checked"
     if st.get("hbWait"):
-        return f"⏳ waiting for the code (max {int(os.environ.get('HB_WAIT') or 180) // 60} min)"
+        return "⏳ checking…"
     if st.get("hbFail") and st.get("hbFail") == st.get("lastLogin"):
-        return "❌ no code – RATTER ALARM"
+        return "❌ not checked"
     t, login = st.get("hbLast"), st.get("lastLogin")
     if t and login and abs(t - login) <= 180000:
-        return f"✅ verified ({ts(t, 'T')})"
+        return "✅ checked"
     return None
 
 
@@ -456,23 +455,41 @@ def check(name, old, key, leave_at=None):
 
 
 
-HEADER = "time,player,event,mode,played,code"
+HEADER = "time,player,event,mode,played,key"
+# leaves before this column existed whose key was checked, worked out from the history of
+# state.json (hbLast within 3 minutes of the session's join); every other old leave: not checked
+CHECKED_BEFORE = {
+    ("2026-11-23 20:43", "Knuffiman"), ("2026-11-23 20:56", "Knuffiman"), ("2026-11-23 21:25", "Knuffiman"),
+    ("2026-11-23 21:30", "Knuffiman"), ("2026-11-23 22:05", "mrkioko"), ("2026-11-23 22:51:31", "Knuffiman"),
+    ("2026-11-23 22:59:31", "Knuffiman"), ("2026-11-23 23:17:10", "Knuffiman"), ("2026-11-23 23:23:00", "Knuffiman"),
+    ("2026-11-23 23:26:38", "Knuffiman")}
 
 
 def session_code(name, st):
-    """Was the mod's join code of this session checked? For the leave line in sessions.csv."""
-    if not has_mod(name):
-        return "no mod"
-    if st.get("hbGone"):
-        return "code message deleted"
+    """Was the mod's key (join code) of this session checked? For the leave line in sessions.csv."""
     login, t = st.get("lastLogin"), st.get("hbLast")
-    if t and login and abs(t - login) <= 180000:
-        return "verified"
-    if st.get("hbFail") and st["hbFail"] == login:
-        return "no code (RATTER alarm)"
-    if st.get("hbWait"):
-        return "left before the code was checked"
-    return "no code"
+    return "checked" if has_mod(name) and t and login and abs(t - login) <= 180000 else "not checked"
+
+
+def migrate_log():
+    """sessions.csv in the newest layout: a key column with checked / not checked on every leave."""
+    if not LOG.exists():
+        return
+    lines = LOG.read_text(encoding="utf-8").splitlines()
+    if not lines or lines[0] == HEADER:
+        return
+    out = [HEADER]
+    for line in lines[1:]:
+        if not line:
+            continue
+        r = (line.split(",") + [""] * 6)[:6]
+        if r[2] == "leave":
+            r[5] = "checked" if r[5] in ("verified", "checked") or (r[0], r[1]) in CHECKED_BEFORE else "not checked"
+        else:
+            r[5] = ""
+        out.append(",".join(r))
+    LOG.write_text("\n".join(out) + "\n", encoding="utf-8")
+    print("sessions.csv: key column filled in")
 
 
 def write_log():
@@ -481,10 +498,7 @@ def write_log():
         return
     from zoneinfo import ZoneInfo
     tz = ZoneInfo("Europe/Berlin")
-    if LOG.exists():
-        lines = LOG.read_text(encoding="utf-8").splitlines()
-        if lines and lines[0] != HEADER:  # older file without the code column
-            LOG.write_text("\n".join([HEADER] + [l + "," for l in lines[1:] if l]) + "\n", encoding="utf-8")
+    migrate_log()
     new = not LOG.exists()
     with LOG.open("a", encoding="utf-8", newline="") as f:
         if new:
@@ -670,6 +684,7 @@ def loop(minutes, every):
     end = time.time() + minutes * 60
     code, synced = blobs(), time.time()
     os.environ["LIVE_TO_BOTTOM"] = "1"
+    migrate_log()  # once per run; committed with the next save
     while time.time() < end:
         start = time.time()
         try:
