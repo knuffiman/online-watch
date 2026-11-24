@@ -282,6 +282,27 @@ def fast_leaves():
     return found
 
 
+def fast_joins():
+    """Between the rounds: the players offline on the card whose mod just sent a new join code, so
+    that the join shows on the live card within seconds (Hypixel only shows it in the next round,
+    and sometimes later). The code is signed, so it is the player's own login. {player: its time}"""
+    if not os.environ.get("HEARTBEAT_WEBHOOK") or not STATE.exists():
+        return {}
+    players = json.loads(STATE.read_text(encoding="utf-8")).get("players", {})
+    found, now = {}, time.time() * 1000
+    for name, p in players.items():
+        if "online" in p and not p["online"] and p.get("uuid") and has_mod(name):
+            try:
+                codes = heartbeat.read_codes(name, p["uuid"])
+            except Exception:  # read again in the next round
+                continue
+            t = codes.get("join")
+            seen = max(p.get("lastLogout") or 0, p.get("hbLeave") or 0, p.get("hbLast") or 0, codes.get("leave") or 0)
+            if t and t > seen and now - t < 5 * 60000:
+                found[name] = t
+    return found
+
+
 def join_ok(st, t):
     """Is t (a join code's time) the code of the login the bot waits for?"""
     wait = st.get("hbWait") or {}
@@ -367,19 +388,20 @@ def embed(name, uuid, title, color, fields):
     }
 
 
-def check(name, old, key, leave_at=None):
+def check(name, old, key, leave_at=None, join_at=None):
     """New state of a player and what happened ("join", "leave" or None).
     One Hypixel request: the status. Login and logout times are when the bot saw the player come
     online and go offline (at most a minute late) or, with the mod, the time of its leave code.
     leave_at: a leave code the fast check between rounds found - then Hypixel is not asked at all.
+    join_at: the same for a new join code: the player counts as online from its time.
     Nothing is sent from here: joins and leaves only go into sessions.csv and the live card."""
     uuid, shown = old.get("uuid"), old.get("shown")
     if not uuid:
         profile = get(f"https://api.mojang.com/users/profiles/minecraft/{name}")
         uuid, shown = profile["id"], profile.get("name")
     shown = shown or name
-    if leave_at:
-        session = {}
+    if leave_at or join_at:
+        session = {"online": True} if join_at else {}
     else:
         session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
     pulled = int(time.time() * 1000)  # when the data was fetched, shown on the live card
@@ -391,7 +413,7 @@ def check(name, old, key, leave_at=None):
 
     # Hypixel can still show a player online for a little while after the mod's leave code: that
     # is no new login unless the mod sent a join code after the leave
-    if online and not was and not first and stale_online(name, uuid, old, pulled):
+    if online and not was and not first and not join_at and stale_online(name, uuid, old, pulled):
         online, where = False, ""
         print(f"{name}: Hypixel still shows online after the leave code, counted as offline")
 
@@ -414,8 +436,8 @@ def check(name, old, key, leave_at=None):
     elif online and old.get("miss"):
         print(f"{name}: back online after {old['miss']} round(s), same session")
     if online and (first or not was):
-        last_in = pulled  # a new login, seen now
-    on = (server(session) or old.get("server")) if online else None  # kept during a lobby switch
+        last_in = join_at or pulled  # a new login: the mod's join code, or seen now
+    on = (server(session) or (None if join_at else old.get("server"))) if online else None  # kept during a lobby switch
 
     login = ts(last_in) + " (" + ts(last_in, "R") + ")" if last_in else None
     logout = ts(last_out) + " (" + ts(last_out, "R") + ")" if last_out else None
@@ -517,12 +539,14 @@ def alarm(webhook, title, card, uid, text):
             send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
 
 
-def main(leaves=None, verified=()):
+def main(leaves=None, verified=(), joins=None):
     """One round: the status of every player, the RATTER check, sessions.csv, the live message.
     The only messages in the channel are the live message and RATTER alarms.
     leaves: {player: time of a leave code} from the fast check between rounds - then only those
     players are updated (without asking Hypixel), the others keep their card from the last round.
-    verified: players whose join code arrived between the rounds - only their mod line changes."""
+    verified: players whose join code arrived between the rounds - only their mod line changes.
+    joins: {player: time of a new join code} of players offline until now - they count as joined."""
+    joins = joins or {}
     EVENTS.clear()
     LIVE.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
@@ -549,7 +573,7 @@ def main(leaves=None, verified=()):
     ratters, errors = [], 0
     for name in names:
         old = players.get(name, {})
-        if leaves is not None and name not in leaves:
+        if leaves is not None and name not in leaves and name not in joins:
             if name in verified and name in LAST and name in players:
                 st = players[name]
                 code_check(name, dict(st), st, int(time.time() * 1000))
@@ -560,7 +584,7 @@ def main(leaves=None, verified=()):
                 LIVE[name] = LAST[name]
             continue
         try:
-            players[name], event = check(name, old, key, (leaves or {}).get(name))
+            players[name], event = check(name, old, key, (leaves or {}).get(name), joins.get(name))
         except (Denied, Throttled, urllib.error.HTTPError) as e:
             why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else str(e)
             print(f"{name}: not checked: {why}")
@@ -734,13 +758,16 @@ def loop(minutes, every):
             time.sleep(fast)
             try:
                 found = fast_leaves()
-                codes = fast_codes() - set(found)
+                joins = {n: t for n, t in fast_joins().items() if n not in found}
+                codes = fast_codes() - set(found) - set(joins)
                 if found:
                     print(f"leave code(s) between rounds: {', '.join(found)}")
+                if joins:
+                    print(f"join(s) by the mod's code between rounds: {', '.join(joins)}")
                 if codes:
                     print(f"join code(s) between rounds: {', '.join(sorted(codes))}")
-                if found or codes:
-                    main(found, codes)
+                if found or codes or joins:
+                    main(found, codes, joins)
                     save(True)
             except Exception as e:
                 print(f"fast check failed: {e!r}")
