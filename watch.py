@@ -637,6 +637,30 @@ def blobs():
 SAVED = [time.time()]
 
 
+def pull():
+    """Gets main from GitHub. Never leaves a half-done rebase behind: on 24 Nov a conflicting pull
+    stayed unfinished, state.json kept git's conflict markers and every check failed for 2 hours.
+    state.json and sessions.csv are written by this bot only, so on a conflict its own version
+    wins (-X theirs: in a rebase, "theirs" are the local commits); sessions.csv is merged line by
+    line (.gitattributes: merge=union), so no join or leave is lost."""
+    r = git("pull", "-q", "--rebase", "-X", "theirs")
+    if r.returncode != 0:
+        git("rebase", "--abort")
+    return r.returncode == 0
+
+
+def repair():
+    """A rebase left over, or conflict markers in state.json: back to a clean tree."""
+    gitdir = STATE.parent / ".git"
+    if (gitdir / "rebase-merge").exists() or (gitdir / "rebase-apply").exists():
+        print("unfinished rebase found, aborting it")
+        git("rebase", "--abort")
+    for f in (STATE, LOG):
+        if f.exists() and "<<<<<<<" in f.read_text(encoding="utf-8"):
+            print(f"conflict markers in {f.name}, taking the last committed version")
+            git("checkout", "HEAD", "--", f.name)
+
+
 def save(now=False):
     """Commits and pushes state.json / sessions.csv: at once when a join or leave was logged,
     otherwise at most every 10 minutes (the playtime of hidden players changes every minute)."""
@@ -649,8 +673,7 @@ def save(now=False):
     git("add", *[f for f in ("state.json", "sessions.csv") if (STATE.parent / f).exists()])
     git("commit", "-q", "-m", "state")
     for attempt in range(4):
-        if git("pull", "-q", "--rebase").returncode != 0:
-            git("rebase", "--abort")
+        pull()
         if git("push", "-q").returncode == 0:
             return
         time.sleep(5 * (attempt + 1))
@@ -684,9 +707,14 @@ def loop(minutes, every):
     end = time.time() + minutes * 60
     code, synced = blobs(), time.time()
     os.environ["LIVE_TO_BOTTOM"] = "1"
+    # the newest state first: this run may have been started from a commit just before the last
+    # one of the run before it (24 Nov: then every push of this run was a conflict)
+    repair()
+    pull()
     migrate_log()  # once per run; committed with the next save
     while time.time() < end:
         start = time.time()
+        repair()
         try:
             if main() == 1:
                 return 1  # secrets missing: no point in going on
@@ -714,7 +742,7 @@ def loop(minutes, every):
             synced = time.time()
             print(f"Hypixel requests in the last 24 h: {today()}")
             save(True)  # a pull needs a clean tree
-            git("pull", "-q", "--rebase")
+            pull()
             if blobs() != code:
                 print("code changed, restarting")
                 break

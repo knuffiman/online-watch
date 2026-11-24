@@ -1,0 +1,2 @@
+# the bot appends to sessions.csv from more than one run: keep both sides
+sessions.csv merge=union
