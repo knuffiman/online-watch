@@ -26,6 +26,6 @@ Key – der Join-Code der Mod – für diese Session geprüft wurde: `checked` o
 **RATTER-Alarm mit Mod** ([`mod/`](mod), Minecraft 26.2 oder 26.1.2, Fabric): **Eine** Mod für alle Accounts – wer mit ihr
 auf einem der Accounts spielt, schickt beim Beitreten auf Hypixel und beim Verlassen einen signierten Code in **eine gemeinsame
 Code-Nachricht** im versteckten Discord-Kanal (jeder Account hat dort seinen Eintrag; die Nachricht nicht löschen). Sieht der Bot
-einen neuen Login und kommt innerhalb von 3 Minuten kein passender Join-Code, gibt es einen RATTER-Alarm (für alle Accounts in
+einen neuen Login und kommt innerhalb von 60 Sekunden kein passender Join-Code, gibt es einen RATTER-Alarm (für alle Accounts in
 `heartbeat.json`). Einrichten: Secret `HEARTBEAT_WEBHOOK` (Webhook des versteckten Kanals), dann Actions → Build mod → Run workflow.
 Beide Jars (26.2 und 26.1.2) landen in **einer Mod-Nachricht**, die bei jedem Build bearbeitet wird – nie auf GitHub.

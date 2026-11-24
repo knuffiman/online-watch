@@ -47,5 +47,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
           RAT_PINGS: 3
-          HB_WAIT: 180
+          HB_WAIT: 60
         run: python3 -u watch.py

@@ -343,7 +343,7 @@ def code_check(name, old, st, now_ms):
         st.pop("hbWait", None)
         print(f"{name}: join code OK")
         return None
-    if now_ms - wait["since"] < int(os.environ.get("HB_WAIT") or 180) * 1000:
+    if now_ms - wait["since"] < int(os.environ.get("HB_WAIT") or 60) * 1000:
         return None
     st.pop("hbWait", None)
     st["hbFail"] = st.get("lastLogin")  # this login had no code (shown on the cards)
