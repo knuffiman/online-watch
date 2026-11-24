@@ -1,35 +1,35 @@
-time,player,event,mode,played
-2026-11-22 23:53,Knuffiman,leave,,2 h 27 min
-2026-11-23 05:20,_GGgaming,join,,
-2026-11-23 05:27,Knuffiman,join,,
-2026-11-23 05:29,Knuffiman,leave,,3 min
-2026-11-23 06:50,_GGgaming,leave,,1 h 30 min
-2026-11-23 08:27,_GGgaming,join,,
-2026-11-23 08:30,_GGgaming,leave,,3 min
-2026-11-23 10:17,_GGgaming,join,Prototype / Lobby,
-2026-11-23 20:23,Knuffiman,join,Prototype / Lobby,
-2026-11-23 20:43,Knuffiman,leave,,20 min
-2026-11-23 20:46,Knuffiman,join,Prototype / Lobby,
-2026-11-23 20:56,Knuffiman,leave,,9 min
-2026-11-23 20:59,Knuffiman,join,Prototype / Lobby,
-2026-11-23 21:09,Knuffiman,leave,,10 min
-2026-11-23 21:13,Knuffiman,join,Prototype / Lobby,
-2026-11-23 21:25,Knuffiman,leave,,12 min
-2026-11-23 21:29,Knuffiman,join,Prototype / Lobby,
-2026-11-23 21:30,Knuffiman,leave,,1 min
-2026-11-23 21:50,Knuffiman,join,Prototype / Lobby,
-2026-11-23 21:53,mrkioko,join,Skyblock / Rift,
-2026-11-23 21:54,mrkioko,leave,,1 min
-2026-11-23 22:04,mrkioko,join,Skyblock / Hub,
-2026-11-23 22:05,mrkioko,leave,,1 min
-2026-11-23 22:51:31,Knuffiman,leave,,1 h 1 min
-2026-11-23 22:56:31,Knuffiman,join,Prototype / Lobby,
-2026-11-23 22:59:31,Knuffiman,leave,,3 min
-2026-11-23 23:02:31,Knuffiman,join,Prototype / Lobby,
-2026-11-23 23:12:40,Knuffiman,leave,,10 min
-2026-11-23 23:16:42,Knuffiman,join,Prototype / Lobby,
-2026-11-23 23:17:10,Knuffiman,leave,,0 min
-2026-11-23 23:22:42,Knuffiman,join,Prototype / Lobby,
-2026-11-23 23:23:00,Knuffiman,leave,,0 min
-2026-11-23 23:23:42,Knuffiman,join,Skyblock / Dynamic,
-2026-11-23 23:26:38,Knuffiman,leave,,3 min
+time,player,event,mode,played,key
+2026-11-22 23:53,Knuffiman,leave,,2 h 27 min,not checked
+2026-11-23 05:20,_GGgaming,join,,,
+2026-11-23 05:27,Knuffiman,join,,,
+2026-11-23 05:29,Knuffiman,leave,,3 min,not checked
+2026-11-23 06:50,_GGgaming,leave,,1 h 30 min,not checked
+2026-11-23 08:27,_GGgaming,join,,,
+2026-11-23 08:30,_GGgaming,leave,,3 min,not checked
+2026-11-23 10:17,_GGgaming,join,Prototype / Lobby,,
+2026-11-23 20:23,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 20:43,Knuffiman,leave,,20 min,checked
+2026-11-23 20:46,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 20:56,Knuffiman,leave,,9 min,checked
+2026-11-23 20:59,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 21:09,Knuffiman,leave,,10 min,not checked
+2026-11-23 21:13,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 21:25,Knuffiman,leave,,12 min,checked
+2026-11-23 21:29,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 21:30,Knuffiman,leave,,1 min,checked
+2026-11-23 21:50,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 21:53,mrkioko,join,Skyblock / Rift,,
+2026-11-23 21:54,mrkioko,leave,,1 min,not checked
+2026-11-23 22:04,mrkioko,join,Skyblock / Hub,,
+2026-11-23 22:05,mrkioko,leave,,1 min,checked
+2026-11-23 22:51:31,Knuffiman,leave,,1 h 1 min,checked
+2026-11-23 22:56:31,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 22:59:31,Knuffiman,leave,,3 min,checked
+2026-11-23 23:02:31,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 23:12:40,Knuffiman,leave,,10 min,not checked
+2026-11-23 23:16:42,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 23:17:10,Knuffiman,leave,,0 min,checked
+2026-11-23 23:22:42,Knuffiman,join,Prototype / Lobby,,
+2026-11-23 23:23:00,Knuffiman,leave,,0 min,checked
+2026-11-23 23:23:42,Knuffiman,join,Skyblock / Dynamic,,
+2026-11-23 23:26:38,Knuffiman,leave,,3 min,checked
