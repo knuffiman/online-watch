@@ -11,7 +11,7 @@
       "total": 127638,
       "counted": 1795467853962,
       "v": 2,
-      "statusAt": 1795536305440,
+      "statusAt": 1795536400719,
       "hbLeave": 1795467921600,
       "hbLast": 1795467843479,
       "hbFail": 1795467193944
@@ -27,7 +27,7 @@
       "total": 21906231,
       "counted": 1795535959216,
       "v": 2,
-      "statusAt": 1795536305681,
+      "statusAt": 1795536400798,
       "hbLeave": 1795535364955,
       "hbLast": 1795535358616,
       "hbFail": 1795536012481
@@ -35,17 +35,17 @@
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
-      "online": false,
-      "where": null,
-      "server": null,
-      "lastLogin": 1795536244381,
+      "online": true,
+      "where": "Main / Lobby",
+      "server": "Main \u2013 Lobby",
+      "lastLogin": 1795536400875,
       "lastLogout": 1795536285398,
       "total": 115910189,
       "counted": 1795536244381,
       "v": 2,
-      "statusAt": 1795536305764,
+      "statusAt": 1795536400875,
       "hbLeave": 1795532741659,
-      "hbLast": 1795532658941,
+      "hbLast": 1795536399233,
       "hbFail": 1795536244381
     }
   },
@@ -73,7 +73,7 @@
     "498757": 180,
     "498758": 180,
     "498759": 318,
-    "498760": 90
+    "498760": 117
   },
   "live": "1574817901620240407"
 }
