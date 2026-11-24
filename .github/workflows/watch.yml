@@ -11,6 +11,10 @@ on:
   workflow_dispatch:
     inputs:
       # kept only so that runs started by older code still start (they send these); ignored
+      test_ratter:
+        description: "Send one test RATTER alarm for this player (@everyone)"
+        type: string
+        default: ""
       loop:
         description: "(ignored)"
         type: boolean
@@ -25,8 +29,9 @@ permissions:
   actions: write
 
 concurrency:
-  # one watching run at a time; the next one waits
-  group: watch
+  # one watching run at a time; the next one waits. A test alarm runs at once (its own group),
+  # so it does not queue behind the ~6 h watch loop.
+  group: ${{ inputs.test_ratter != '' && format('test-{0}', github.run_id) || 'watch' }}
   cancel-in-progress: false
 
 jobs:
@@ -45,6 +50,7 @@ jobs:
           # pinged only with a RATTER alarm
           DISCORD_IDS: ${{ vars.DISCORD_IDS }}
           GITHUB_TOKEN: ${{ github.token }}
+          TEST_RATTER: ${{ inputs.test_ratter }}
           # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
           RAT_PINGS: 3
           HB_WAIT: 0

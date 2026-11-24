@@ -852,6 +852,44 @@ def loop(minutes, every):
     return 0
 
 
+def test_rat(name):
+    """Sends one test RATTER alarm (with @everyone) for a player, without touching the state."""
+    webhook = os.environ.get("DISCORD_WEBHOOK", "")
+    if not webhook:
+        print("DISCORD_WEBHOOK fehlt (Repo-Secret)")
+        return 1
+    saved = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
+    players = saved.get("players", {})
+    real = next((n for n in players if n.lower() == name.lower()), name)
+    uuid = players.get(real, {}).get("uuid")
+    if not uuid:
+        try:
+            uuid = get(f"https://api.mojang.com/users/profiles/minecraft/{real}")["id"]
+        except Exception as e:
+            print(f"no uuid for {real}: {e!r}")
+            uuid = ""
+    ids = {}
+    for pair in (os.environ.get("DISCORD_IDS") or "").split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            v = "".join(c for c in v if c.isdigit())
+            if v:
+                ids[k.strip().lower()] = v
+    now = int(time.time() * 1000)
+    card = embed(real, uuid, f"🚨 RATTER ALARM – {real}", RED, [
+        ("Login", ts(now) + " (" + ts(now, "R") + ")"),
+        ("Server", "test")])
+    card["description"] = ("🧪 **This is only a test.** A real alarm comes when someone joins "
+                           f"{real} on Hypixel without the Online Watch mod's code.")
+    card["footer"] = {"text": f"{real} • test"}
+    alarm(webhook, "RATTER ALARM (test)", card, ids.get(real.lower()),
+          f"RATTER ALARM (test) for {real} – this is only a test")
+    print(f"test RATTER alarm sent for {real}" + ("" if ids.get(real.lower()) else " (no Discord ID)"))
+    return 0
+
+
 if __name__ == "__main__":
+    if os.environ.get("TEST_RATTER", "").strip():
+        sys.exit(test_rat(os.environ["TEST_RATTER"].strip()))
     # every run watches: a check every minute for almost 6 hours, then the next run
     sys.exit(loop(int(os.environ.get("LOOP_MINUTES") or 345), int(os.environ.get("EVERY") or 60)))
