@@ -20,7 +20,9 @@ Optional unter *Variables*: `PLAYERS` mit anderen Spielernamen, durch Komma getr
 Starten oder neu starten: Actions → Online Watch → Run workflow (wartet, bis ein laufender Watch-Run fertig ist).
 
 **Datenbank:** [`sessions.csv`](sessions.csv) – eine Zeile pro Join und pro Leave
-(Zeit in deutscher Zeit, Spieler, Ereignis, Modus beim Join, Spielzeit beim Leave).
+(Zeit in deutscher Zeit, Spieler, Ereignis, Modus beim Join, Spielzeit beim Leave, und beim Leave in `code`, ob der
+Join-Code der Mod für diese Session geprüft wurde: `verified`, `no code (RATTER alarm)`, `left before the code was checked`,
+`no code`, `code message deleted` oder `no mod`).
 
 **RATTER-Alarm mit Mod** ([`mod/`](mod), Minecraft 26.2 oder 26.1.2, Fabric): **Eine** Mod für alle Accounts – wer mit ihr
 auf einem der Accounts spielt, schickt beim Beitreten auf Hypixel und beim Verlassen einen signierten Code in **eine gemeinsame

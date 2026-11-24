@@ -426,10 +426,10 @@ def check(name, old, key, leave_at=None):
     if not first:
         if online and not was:
             event = "join"
-            EVENTS.append((last_in, shown, "join", where, ""))
+            EVENTS.append((last_in, shown, "join", where, "", ""))
         elif not online and was:
             event = "leave"
-            EVENTS.append((last_out, shown, "leave", "", played or ""))
+            EVENTS.append((last_out, shown, "leave", "", played or "", ""))
 
     total, counted = playtime(old, last_in, last_out, shown)
     status = embed(shown, uuid, f"🟢 {shown} is online" if online else f"🔴 {shown} is offline",
@@ -456,19 +456,42 @@ def check(name, old, key, leave_at=None):
 
 
 
+HEADER = "time,player,event,mode,played,code"
+
+
+def session_code(name, st):
+    """Was the mod's join code of this session checked? For the leave line in sessions.csv."""
+    if not has_mod(name):
+        return "no mod"
+    if st.get("hbGone"):
+        return "code message deleted"
+    login, t = st.get("lastLogin"), st.get("hbLast")
+    if t and login and abs(t - login) <= 180000:
+        return "verified"
+    if st.get("hbFail") and st["hbFail"] == login:
+        return "no code (RATTER alarm)"
+    if st.get("hbWait"):
+        return "left before the code was checked"
+    return "no code"
+
+
 def write_log():
     """Appends the joins and leaves of this run to sessions.csv, oldest first."""
     if not EVENTS:
         return
     from zoneinfo import ZoneInfo
     tz = ZoneInfo("Europe/Berlin")
+    if LOG.exists():
+        lines = LOG.read_text(encoding="utf-8").splitlines()
+        if lines and lines[0] != HEADER:  # older file without the code column
+            LOG.write_text("\n".join([HEADER] + [l + "," for l in lines[1:] if l]) + "\n", encoding="utf-8")
     new = not LOG.exists()
     with LOG.open("a", encoding="utf-8", newline="") as f:
         if new:
-            f.write("time,player,event,mode,played\n")
-        for ms, name, event, mode, played in sorted(EVENTS):
+            f.write(HEADER + "\n")
+        for ms, name, event, mode, played, code in sorted(EVENTS):
             when = datetime.fromtimestamp(ms / 1000, tz).strftime("%Y-%m-%d %H:%M:%S")
-            f.write(f"{when},{name},{event},{mode},{played}\n")
+            f.write(f"{when},{name},{event},{mode},{played},{code}\n")
     EVENTS.clear()
 
 
@@ -535,6 +558,10 @@ def main(leaves=None, verified=()):
             continue
         st = players[name]
         card = code_check(name, old, st, int(time.time() * 1000))
+        # the leave line in sessions.csv says whether the session's join code was checked
+        for i, e in enumerate(EVENTS):
+            if e[1] == st.get("shown") and e[2] == "leave" and not e[5]:
+                EVENTS[i] = e[:5] + (session_code(name, st),)
         if card:
             ratters.append((card, ids.get(name.lower())))
             print(f"{name}: RATTER ALARM (no join code)")
