@@ -19,17 +19,17 @@
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
-      "online": false,
-      "where": null,
+      "online": true,
+      "where": "",
       "server": null,
-      "lastLogin": 1795534559471,
+      "lastLogin": 1795535075240,
       "lastLogout": 1795535066187,
       "total": 21551525,
       "counted": 1795534559471,
       "v": 2,
-      "statusAt": 1795535072801,
+      "statusAt": 1795535085639,
       "hbLeave": 1795535066187,
-      "hbLast": 1795534186578,
+      "hbLast": 1795535075240,
       "hbFail": 1795534559471
     },
     "_gggaming": {
