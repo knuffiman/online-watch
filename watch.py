@@ -540,11 +540,12 @@ def write_log():
 
 
 def alarm(webhook, title, card, uid, text):
-    """An alarm card, then the player pinged several times."""
+    """An alarm card, then @everyone pinged several times (the player too, if known)."""
     send(webhook, {"content": f"🚨🚨🚨 **{title}** 🚨🚨🚨", "embeds": [card]})
+    who = f"<@{uid}> " if uid else ""
     for i in range(int(os.environ.get("RAT_PINGS") or 3)):
-        if uid:
-            send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
+        send(webhook, {"content": f"🚨 @everyone {who}{text}",
+                       "allowed_mentions": {"parse": ["everyone"], "users": [uid] if uid else []}})
 
 
 def failsafe(webhook, problems, saved):
