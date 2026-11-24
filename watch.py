@@ -582,6 +582,12 @@ def main(leaves=None, verified=()):
         code = mod_status(st) if st["online"] else None
         if code:
             set_mod_field(LIVE[name], code)
+        if not st["online"] and has_mod(name):
+            # offline: whether the key of the last session was checked, next to its playtime
+            key_ok = session_code(name, st) == "checked"
+            for f in LIVE[name]["fields"]:
+                if f["name"] == "Last session":
+                    f["value"] += " · ✅ key checked" if key_ok else " · ❌ key not checked"
         LAST[name] = LIVE[name]
         if event:
             print(f"{name}: {event}" + (f" ({code})" if code else ""))
