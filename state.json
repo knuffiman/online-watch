@@ -3,16 +3,16 @@
     "mrkioko": {
       "uuid": "2c8d3d5f841540c0987e06d889f1bf02",
       "shown": "mrkioko",
-      "online": true,
-      "where": "Skyblock / Crystal Hollows",
-      "server": "Skyblock \u2013 Crystal Hollows",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795551353175,
-      "lastLogout": 1795551353175,
+      "lastLogout": 1795551988667,
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795551664276,
-      "hbLeave": 1795551353175,
+      "statusAt": 1795551994483,
+      "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
     },
@@ -27,7 +27,7 @@
       "total": 24902052,
       "counted": 1795547987447,
       "v": 2,
-      "statusAt": 1795551664364,
+      "statusAt": 1795551985231,
       "hbLeave": 1795548000078,
       "hbLast": 1795547987447,
       "hbFail": 1795547599754
@@ -43,7 +43,7 @@
       "total": 116249242,
       "counted": 1795549484122,
       "v": 2,
-      "statusAt": 1795551664447,
+      "statusAt": 1795551985327,
       "hbLeave": 1795551494564,
       "hbLast": 1795549484122,
       "hbFail": 1795536244381
@@ -73,7 +73,7 @@
     "498761": 1014,
     "498762": 1020,
     "498763": 1008,
-    "498764": 354
+    "498764": 444
   },
   "live": "1574877418231959726"
 }
