@@ -11,7 +11,7 @@
       "total": 127638,
       "counted": 1795467853962,
       "v": 2,
-      "statusAt": 1795533058489,
+      "statusAt": 1795533478498,
       "hbLeave": 1795467921600,
       "hbLast": 1795467843479,
       "hbFail": 1795467193944
@@ -27,7 +27,7 @@
       "total": 17060755,
       "counted": 1795529808323,
       "v": 2,
-      "statusAt": 1795533058617,
+      "statusAt": 1795533478720,
       "hbLeave": 1795472798196,
       "hbLast": 1795530194069,
       "hbFail": 1795529808323
@@ -36,20 +36,17 @@
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "Skyblock / Dynamic",
-      "server": "Skyblock \u2013 Private Island",
+      "where": "Skyblock / Mining 3",
+      "server": "Skyblock \u2013 Dwarven Mines",
       "lastLogin": 1795533058722,
       "lastLogout": 1795532741659,
       "total": 112820407,
       "counted": 1795532695014,
       "v": 2,
-      "statusAt": 1795533058722,
+      "statusAt": 1795533478851,
       "hbLeave": 1795532741659,
       "hbLast": 1795532658941,
-      "hbWait": {
-        "since": 1795533058722,
-        "login": 1795533058722
-      }
+      "hbFail": 1795533058722
     }
   },
   "req": {
@@ -75,7 +72,7 @@
     "498756": 180,
     "498757": 180,
     "498758": 180,
-    "498759": 33
+    "498759": 54
   },
-  "live": "1574803780007100429"
+  "live": "1574804791018659884"
 }
