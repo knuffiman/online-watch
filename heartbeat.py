@@ -63,10 +63,24 @@ def message_id(player=None):
     return ids().get("codes")
 
 
+PAUSE = [0.0]  # Discord said "too many requests": no reads until then (time.time())
+
+
 def request(url, data=None, method="GET", headers=None):
+    if time.time() < PAUSE[0]:
+        raise RuntimeError(f"Discord rate limit, paused for {PAUSE[0] - time.time():.1f} s more")
     req = urllib.request.Request(url, data=data, method=method, headers={**UA, **(headers or {})})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        body = r.read()
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            body = r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 429:  # wait as long as Discord asks, so that the limit is never hit twice
+            try:
+                wait = float(json.loads(e.read()).get("retry_after") or 1)
+            except Exception:
+                wait = float(e.headers.get("Retry-After") or 1)
+            PAUSE[0] = time.time() + min(max(wait, 1), 600)
+        raise
     return json.loads(body) if body else None
 
 
@@ -98,14 +112,16 @@ def content_of(msg_id):
     return content if isinstance(content, dict) else {}
 
 
-CACHE = {}  # the shared message read in the last few seconds: one read per round for all players
+CACHE = {}  # the shared message read just now: one read per check for all players
+OLD = {}  # the legacy messages: read at most every LEGACY_EVERY seconds (only for older jars)
+LEGACY_EVERY = 30
 
 
 def shared():
     msg_id = ids().get("codes")
     if not msg_id:
         return {}
-    if CACHE.get("id") == msg_id and time.time() - CACHE.get("at", 0) < 5:
+    if CACHE.get("id") == msg_id and time.time() - CACHE.get("at", 0) < 0.8:
         return CACHE["content"]
     try:
         content = content_of(msg_id)
@@ -136,7 +152,16 @@ def read_codes(player, uuid):
     legacy = next((v for k, v in ids().get("legacy", {}).items() if k.lower() == player.lower()), None)
     if legacy:
         try:
-            old = content_of(legacy)
+            if time.time() - OLD.get(legacy, (0, None))[0] >= LEGACY_EVERY:
+                try:
+                    OLD[legacy] = (time.time(), content_of(legacy))
+                except urllib.error.HTTPError as e:
+                    if e.code != 404:
+                        raise
+                    OLD[legacy] = (time.time(), e)
+            old = OLD[legacy][1]
+            if isinstance(old, Exception):
+                raise old
             entries.append({"join": old} if "join" not in old and "sig" in old else old)
         except urllib.error.HTTPError as e:
             if e.code != 404:

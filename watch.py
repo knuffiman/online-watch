@@ -35,6 +35,7 @@ GREEN, RED, GREY, BLUE = 0x43B581, 0xF04747, 0x99AAB5, 0x5865F2
 
 
 PAUSE = [0]  # Hypixel said "too many requests": no Hypixel requests until then (time.time())
+PROBLEMS = []  # what went wrong with Hypixel in this round (for the failsafe)
 LAST = {}  # the newest live card of each player, for the fast updates between rounds
 REQ = {}  # Hypixel requests per hour ("<hour>": n), kept in state.json - only to see the usage
 # leaving needs this many rounds in a row offline: a lobby or server switch can show a player
@@ -110,7 +111,7 @@ def live(webhook, msg_id, bottom=False):
     if not LIVE:
         return msg_id
     now = int(time.time())
-    payload = {"content": f"📡 **Live status** – updated every minute (last: <t:{now}:T>, <t:{now}:R>)",
+    payload = {"content": f"📡 **Live status** – updated every {os.environ.get('EVERY') or 60} s (last: <t:{now}:T>, <t:{now}:R>)",
                "embeds": list(LIVE.values())[:10]}
     base = webhook.split("?")[0]
     if msg_id and bottom:
@@ -291,13 +292,17 @@ def fast_joins():
     players = json.loads(STATE.read_text(encoding="utf-8")).get("players", {})
     found, now = {}, time.time() * 1000
     for name, p in players.items():
-        if "online" in p and not p["online"] and p.get("uuid") and has_mod(name):
+        if "online" in p and p.get("uuid") and has_mod(name):
             try:
                 codes = heartbeat.read_codes(name, p["uuid"])
             except Exception:  # read again in the next round
                 continue
             t = codes.get("join")
             seen = max(p.get("lastLogout") or 0, p.get("hbLeave") or 0, p.get("hbLast") or 0, codes.get("leave") or 0)
+            if p["online"]:
+                # still shown online (e.g. joined without the mod, then rejoined with it before the
+                # bot saw the leave): a join code clearly after this login is a new session
+                seen = max(seen, (p.get("lastLogin") or 0) + 20000)
             if t and t > seen and now - t < 5 * 60000:
                 found[name] = t
     return found
@@ -403,7 +408,10 @@ def check(name, old, key, leave_at=None, join_at=None):
     if leave_at or join_at:
         session = {"online": True} if join_at else {}
     else:
-        session = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key}).get("session") or {}
+        data = get(f"https://api.hypixel.net/v2/status?uuid={uuid}", {"API-Key": key})
+        if not isinstance(data, dict) or not data.get("success") or not isinstance(data.get("session"), dict):
+            raise Denied("Hypixel sent no status: " + json.dumps(data)[:120])
+        session = data["session"]
     pulled = int(time.time() * 1000)  # when the data was fetched, shown on the live card
     online = bool(session.get("online"))
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
@@ -539,6 +547,39 @@ def alarm(webhook, title, card, uid, text):
             send(webhook, {"content": f"🚨 <@{uid}> {text}", "allowed_mentions": {"parse": [], "users": [uid]}})
 
 
+def failsafe(webhook, problems, saved):
+    """Hypixel sends errors or nothing: after FAILSAFE_ROUNDS rounds in a row the player in
+    ALERT_USER (default Knuffiman, Discord id from DISCORD_IDS) is pinged, again every hour while it
+    lasts, and a note without ping comes when it works again. Kept in state.json ("failsafe")."""
+    fs = dict(saved.get("failsafe") or {})
+    now = int(time.time() * 1000)
+    user = (os.environ.get("ALERT_USER") or "Knuffiman").strip()
+    uid = next((v.split("=", 1)[1].strip() for v in (os.environ.get("DISCORD_IDS") or "").split(",")
+                if "=" in v and v.split("=", 1)[0].strip().lower() == user.lower()), "")
+    uid = "".join(c for c in uid if c.isdigit())
+    ping = f"<@{uid}> " if uid else ""
+    mention = {"parse": [], "users": [uid] if uid else []}
+    if problems:
+        fs["rounds"] = fs.get("rounds", 0) + 1
+        fs.setdefault("since", now)
+        fs["why"] = "; ".join(problems)[:900]
+        due = not fs.get("sent") or now - fs["sent"] >= 3600000
+        if fs["rounds"] >= int(os.environ.get("FAILSAFE_ROUNDS") or 3) and due:
+            send(webhook, {"content": f"⚠️ {ping}**Hypixel API problem** since <t:{fs['since'] // 1000}:R> – "
+                                      "the watch cannot see the players.\n"
+                                      f"```{fs['why']}```",
+                           "allowed_mentions": mention})
+            fs["sent"] = now
+            print(f"failsafe: {user} notified ({fs['why']})")
+    elif fs:
+        if fs.get("sent"):
+            send(webhook, {"content": f"✅ Hypixel API works again (problem since <t:{fs['since'] // 1000}:f>).",
+                           "allowed_mentions": {"parse": []}})
+            print("failsafe: works again")
+        fs = {}
+    return fs
+
+
 def main(leaves=None, verified=(), joins=None):
     """One round: the status of every player, the RATTER check, sessions.csv, the live message.
     The only messages in the channel are the live message and RATTER alarms.
@@ -549,6 +590,7 @@ def main(leaves=None, verified=(), joins=None):
     joins = joins or {}
     EVENTS.clear()
     LIVE.clear()
+    PROBLEMS.clear()
     webhook = os.environ.get("DISCORD_WEBHOOK", "")
     key = os.environ.get("HYPIXEL_KEY", "")
     names = [n.strip() for n in (os.environ.get("PLAYERS") or DEFAULT).split(",") if n.strip()]
@@ -584,10 +626,24 @@ def main(leaves=None, verified=(), joins=None):
                 LIVE[name] = LAST[name]
             continue
         try:
+            if joins.get(name) and old.get("online"):
+                # rejoined with the mod while still shown online: the old session ends first (at the
+                # first offline round if Hypixel showed one, else at the join), with its own key state
+                end = min(old.get("offAt") or joins[name], joins[name])
+                ended, _ = check(name, old, key, leave_at=end)
+                for k in ("hbLast", "hbFail", "hbGone"):
+                    if old.get(k):
+                        ended[k] = old[k]
+                for i, e in enumerate(EVENTS):
+                    if e[1] == ended.get("shown") and e[2] == "leave" and not e[5]:
+                        EVENTS[i] = e[:5] + (session_code(name, old),)
+                print(f"{name}: rejoined with the mod, the session before ends at {ts(end, 'T')}")
+                old = ended
             players[name], event = check(name, old, key, (leaves or {}).get(name), joins.get(name))
-        except (Denied, Throttled, urllib.error.HTTPError) as e:
-            why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else str(e)
+        except (Denied, Throttled, urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError) as e:
+            why = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else (str(e) or type(e).__name__)
             print(f"{name}: not checked: {why}")
+            PROBLEMS.append(f"{name}: {why}")
             errors += 1
             # the live card says why, instead of showing an old status as if it were current
             LIVE[name] = embed(old.get("shown") or name, old.get("uuid") or "", f"⚠️ {old.get('shown') or name}",
@@ -637,6 +693,16 @@ def main(leaves=None, verified=(), joins=None):
     new["req"] = {k: v for k, v in sorted(REQ.items()) if hour - int(k) < 25}
     if live_id:
         new["live"] = live_id
+    if leaves is None:  # a full Hypixel round
+        try:
+            fs = failsafe(webhook, PROBLEMS, saved)
+        except Exception as e:
+            print(f"failsafe message failed: {e!r}")
+            fs = saved.get("failsafe") or {}
+    else:
+        fs = saved.get("failsafe") or {}
+    if fs:
+        new["failsafe"] = fs
     if new != saved:
         STATE.write_text(json.dumps(new, indent=2) + "\n", encoding="utf-8")
     if time.time() < PAUSE[0]:

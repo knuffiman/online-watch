@@ -47,5 +47,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
           RAT_PINGS: 3
-          HB_WAIT: 60
+          HB_WAIT: 0
+          # seconds between two Hypixel rounds, and between two reads of the mod codes (Discord)
+          EVERY: 10
+          FAST: 1
+          # pinged (via DISCORD_IDS) when Hypixel sends errors or nothing for 3 rounds in a row
+          ALERT_USER: Knuffiman
         run: python3 -u watch.py
