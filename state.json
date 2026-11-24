@@ -11,7 +11,7 @@
       "total": 127638,
       "counted": 1795467853962,
       "v": 2,
-      "statusAt": 1795546851435,
+      "statusAt": 1795547313512,
       "hbLeave": 1795467921600,
       "hbLast": 1795467843479,
       "hbFail": 1795467193944
@@ -27,7 +27,7 @@
       "total": 24761619,
       "counted": 1795546810209,
       "v": 2,
-      "statusAt": 1795546851514,
+      "statusAt": 1795547324551,
       "hbLeave": 1795546810209,
       "hbLast": 1795546810209,
       "hbFail": 1795536012481
@@ -36,16 +36,16 @@
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "Skyblock / Mining 3",
-      "server": "Skyblock \u2013 Dwarven Mines",
-      "lastLogin": 1795546762495,
-      "lastLogout": 1795546762495,
+      "where": "",
+      "server": null,
+      "lastLogin": 1795547326615,
+      "lastLogout": 1795547326615,
       "total": 116221131,
-      "counted": 1795546762495,
+      "counted": 1795547326615,
       "v": 2,
-      "statusAt": 1795546851990,
-      "hbLeave": 1795546762495,
-      "hbLast": 1795546762495,
+      "statusAt": 1795547328830,
+      "hbLeave": 1795547326615,
+      "hbLast": 1795547326615,
       "hbFail": 1795536244381
     }
   },
@@ -73,7 +73,12 @@
     "498760": 1017,
     "498761": 1014,
     "498762": 1020,
-    "498763": 15
+    "498763": 147
   },
-  "live": "1574817901620240407"
+  "live": "1574817901620240407",
+  "failsafe": {
+    "rounds": 1,
+    "since": 1795547325058,
+    "why": "mrkioko: HTTP 502"
+  }
 }
