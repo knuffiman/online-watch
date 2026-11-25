@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795610512237,
+      "statusAt": 1795610682057,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -20,14 +20,14 @@
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
       "online": true,
-      "where": "",
-      "server": null,
+      "where": "Skyblock / Dynamic",
+      "server": "Skyblock \u2013 Private Island",
       "lastLogin": 1795610507668,
       "lastLogout": 1795610507668,
       "total": 25359711,
       "counted": 1795610507668,
       "v": 2,
-      "statusAt": 1795610514287,
+      "statusAt": 1795610682110,
       "hbLeave": 1795610507668,
       "hbLast": 1795610507668,
       "hbFail": 1795547599754
@@ -43,7 +43,7 @@
       "total": 116587936,
       "counted": 1795610121007,
       "v": 2,
-      "statusAt": 1795610512372,
+      "statusAt": 1795610682163,
       "hbLeave": 1795610121007,
       "hbLast": 1795610121007,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498777": 1014,
     "498778": 1020,
     "498779": 1011,
-    "498780": 711
+    "498780": 759
   },
   "live": "1575064070544040020"
 }
