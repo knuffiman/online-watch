@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795623517505,
+      "statusAt": 1795623604246,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -20,16 +20,16 @@
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
       "online": true,
-      "where": "Prototype / Lobby",
-      "server": "Prototype \u2013 Lobby",
-      "lastLogin": 1795623174458,
-      "lastLogout": 1795623174458,
+      "where": "",
+      "server": null,
+      "lastLogin": 1795623603081,
+      "lastLogout": 1795623603081,
       "total": 33495945,
-      "counted": 1795623174458,
+      "counted": 1795623603081,
       "v": 2,
-      "statusAt": 1795623517554,
-      "hbLeave": 1795623174458,
-      "hbLast": 1795623174458,
+      "statusAt": 1795623606891,
+      "hbLeave": 1795623603081,
+      "hbLast": 1795623603081,
       "hbFail": 1795547599754
     },
     "_gggaming": {
@@ -43,7 +43,7 @@
       "total": 116587936,
       "counted": 1795622538588,
       "v": 2,
-      "statusAt": 1795623517612,
+      "statusAt": 1795623604354,
       "hbLeave": 1795622538588,
       "hbLast": 1795622538588,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498781": 1014,
     "498782": 1002,
     "498783": 1008,
-    "498784": 315
+    "498784": 339
   },
   "live": "1575150981497233432"
 }
