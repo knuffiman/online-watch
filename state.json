@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795633273426,
+      "statusAt": 1795633390908,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -19,15 +19,15 @@
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
-      "online": true,
-      "where": "Skyblock / Crystal Hollows",
-      "server": "Skyblock \u2013 Crystal Hollows",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795633254313,
-      "lastLogout": 1795633254313,
+      "lastLogout": 1795633369607,
       "total": 33564595,
       "counted": 1795633254313,
       "v": 2,
-      "statusAt": 1795633273511,
+      "statusAt": 1795633390959,
       "hbLeave": 1795633254313,
       "hbLast": 1795633254313,
       "hbFail": 1795547599754
@@ -36,14 +36,14 @@
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "",
-      "server": null,
+      "where": "Skyblock / Fishing 1",
+      "server": "Skyblock \u2013 Backwater Bayou",
       "lastLogin": 1795633274730,
       "lastLogout": 1795633242326,
       "total": 116608889,
       "counted": 1795632600422,
       "v": 2,
-      "statusAt": 1795633279971,
+      "statusAt": 1795633391183,
       "hbLeave": 1795633242326,
       "hbLast": 1795633274730,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498784": 1008,
     "498785": 1011,
     "498786": 1008,
-    "498787": 21
+    "498787": 54
   },
   "live": "1575150981497233432"
 }
