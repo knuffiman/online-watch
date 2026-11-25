@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795647252855,
+      "statusAt": 1795647428702,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -19,16 +19,16 @@
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
-      "online": true,
-      "where": "Skyblock / Crystal Hollows",
-      "server": "Skyblock \u2013 Crystal Hollows",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795647005957,
-      "lastLogout": 1795641383309,
-      "total": 33611408,
-      "counted": 1795641092524,
+      "lastLogout": 1795647427218,
+      "total": 34032669,
+      "counted": 1795647005957,
       "v": 2,
-      "statusAt": 1795647252924,
-      "hbLeave": 1795641383309,
+      "statusAt": 1795647432627,
+      "hbLeave": 1795647427218,
       "hbLast": 1795647005957,
       "hbFail": 1795547599754
     },
@@ -43,7 +43,7 @@
       "total": 116813230,
       "counted": 1795635454216,
       "v": 2,
-      "statusAt": 1795647252999,
+      "statusAt": 1795647428830,
       "hbLeave": 1795635477608,
       "hbLast": 1795635454216,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498787": 1005,
     "498788": 1002,
     "498789": 999,
-    "498790": 906
+    "498790": 954
   },
   "live": "1575237854991220852"
 }
