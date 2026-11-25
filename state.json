@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795647428702,
+      "statusAt": 1795647461494,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -19,17 +19,17 @@
     "Knuffiman": {
       "uuid": "898089247cc1490c82daba24b47c8cb1",
       "shown": "Knuffiman",
-      "online": false,
-      "where": null,
-      "server": null,
-      "lastLogin": 1795647005957,
+      "online": true,
+      "where": "Skyblock / Mining 3",
+      "server": "Skyblock \u2013 Dwarven Mines",
+      "lastLogin": 1795647461561,
       "lastLogout": 1795647427218,
       "total": 34032669,
       "counted": 1795647005957,
       "v": 2,
-      "statusAt": 1795647432627,
+      "statusAt": 1795647461561,
       "hbLeave": 1795647427218,
-      "hbLast": 1795647005957,
+      "hbLast": 1795647456877,
       "hbFail": 1795547599754
     },
     "_gggaming": {
@@ -43,7 +43,7 @@
       "total": 116813230,
       "counted": 1795635454216,
       "v": 2,
-      "statusAt": 1795647428830,
+      "statusAt": 1795647461764,
       "hbLeave": 1795635477608,
       "hbLast": 1795635454216,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498787": 1005,
     "498788": 1002,
     "498789": 999,
-    "498790": 954
+    "498790": 963
   },
   "live": "1575237854991220852"
 }
