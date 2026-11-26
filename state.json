@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795703577584,
+      "statusAt": 1795703600514,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -22,28 +22,28 @@
       "online": true,
       "where": "",
       "server": null,
-      "lastLogin": 1795703570301,
-      "lastLogout": 1795703570301,
+      "lastLogin": 1795703600512,
+      "lastLogout": 1795703600512,
       "total": 34342168,
-      "counted": 1795703570301,
+      "counted": 1795703600512,
       "v": 2,
-      "statusAt": 1795703579488,
-      "hbLeave": 1795703570301,
-      "hbLast": 1795703570301,
+      "statusAt": 1795703608208,
+      "hbLeave": 1795703600512,
+      "hbLast": 1795703600512,
       "hbFail": 1795547599754
     },
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "",
-      "server": null,
+      "where": "Skyblock / Foraging 3",
+      "server": "Skyblock \u2013 Foraging 3",
       "lastLogin": 1795703583747,
       "lastLogout": 1795703583747,
       "total": 116914617,
       "counted": 1795703583747,
       "v": 2,
-      "statusAt": 1795703587462,
+      "statusAt": 1795703600703,
       "hbLeave": 1795703583747,
       "hbLast": 1795703583747,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498803": 1002,
     "498804": 1002,
     "498805": 1011,
-    "498806": 564
+    "498806": 570
   },
   "live": "1575498469047803928"
 }
