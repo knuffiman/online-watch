@@ -306,7 +306,12 @@ def fast_joins():
             seen = max(p.get("lastLogout") or 0, p.get("hbLeave") or 0, p.get("hbLast") or 0, codes.get("leave") or 0)
             if p["online"]:
                 # still shown online (e.g. joined without the mod, then rejoined with it before the
-                # bot saw the leave): a join code clearly after this login is a new session
+                # bot saw the leave): a join code clearly after this login is a new session - but
+                # only if this session's key was not checked. The mod also sends a join code on every
+                # Hypixel server switch (newer Minecraft calls that a new join); a checked session
+                # just goes on then.
+                if session_code(name, p) == "checked":
+                    continue
                 seen = max(seen, (p.get("lastLogin") or 0) + 20000)
             if t and t > seen and now - t < 5 * 60000:
                 found[name] = t
