@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795717213841,
+      "statusAt": 1795717272491,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -27,7 +27,7 @@
       "total": 35431964,
       "counted": 1795717182227,
       "v": 2,
-      "statusAt": 1795717213935,
+      "statusAt": 1795717272577,
       "hbLeave": 1795717182227,
       "hbLast": 1795717182227,
       "hbFail": 1795547599754
@@ -36,14 +36,14 @@
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "",
-      "server": null,
+      "where": "Skyblock / Crimson Isle",
+      "server": "Skyblock \u2013 Crimson Isle",
       "lastLogin": 1795717223626,
       "lastLogout": 1795717223626,
       "total": 120222552,
       "counted": 1795717223626,
       "v": 2,
-      "statusAt": 1795717227623,
+      "statusAt": 1795717272669,
       "hbLeave": 1795717223626,
       "hbLast": 1795717223626,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498807": 1026,
     "498808": 1017,
     "498809": 1011,
-    "498810": 336
+    "498810": 351
   },
   "live": "1575498469047803928"
 }
