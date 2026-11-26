@@ -255,10 +255,15 @@ def mod_leave(name, uuid, old, last_in):
 
 
 def stale_online(name, uuid, old, now_ms):
-    """Hypixel shows online, but the mod's leave code ended the session less than 5 minutes ago and
+    """Hypixel shows online, but the mod's leave code ended the session less than 2 minutes ago, Hypixel has not shown
+    the player offline since, and
     no join code came after it: Hypixel has not caught up yet."""
     t = old.get("hbLeave")
-    if not t or now_ms - t > 5 * 60000 or not has_mod(name):
+    if not t or now_ms - t > 2 * 60000 or not has_mod(name):
+        return False
+    if (old.get("offSeen") or 0) >= t:
+        # Hypixel already showed the player offline after the leave code: it has caught up, so this
+        # is a new login (e.g. without the mod) and not an old "online"
         return False
     try:
         joined = heartbeat.read_codes(name, uuid).get("join")
@@ -414,6 +419,8 @@ def check(name, old, key, leave_at=None, join_at=None):
         session = data["session"]
     pulled = int(time.time() * 1000)  # when the data was fetched, shown on the live card
     online = bool(session.get("online"))
+    # when Hypixel itself last showed the player offline (after a leave code it has caught up then)
+    off_seen = pulled if not leave_at and not join_at and not online else old.get("offSeen")
     where = " / ".join(x.replace("_", " ").title() for x in (session.get("gameType"), session.get("mode")) if x)
     first = "online" not in old
     was = bool(old.get("online"))
@@ -481,6 +488,8 @@ def check(name, old, key, leave_at=None, join_at=None):
         state["hbLeave"] = left or old["hbLeave"]
     if miss:
         state.update({"miss": miss, "offAt": off_at})
+    if off_seen and state.get("hbLeave") and off_seen >= state["hbLeave"]:
+        state["offSeen"] = off_seen
     return state, event
 
 
