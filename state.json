@@ -11,7 +11,7 @@
       "total": 246019,
       "counted": 1795551353175,
       "v": 2,
-      "statusAt": 1795702870900,
+      "statusAt": 1795703343426,
       "hbLeave": 1795551988667,
       "hbLast": 1795551353175,
       "hbFail": 1795550432577
@@ -27,7 +27,7 @@
       "total": 34209962,
       "counted": 1795647638854,
       "v": 2,
-      "statusAt": 1795702871004,
+      "statusAt": 1795703343522,
       "hbLeave": 1795647645504,
       "hbLast": 1795647638854,
       "hbFail": 1795547599754
@@ -36,14 +36,14 @@
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
       "online": true,
-      "where": "",
-      "server": null,
+      "where": "Skyblock / Crystal Hollows",
+      "server": "Skyblock \u2013 Crystal Hollows",
       "lastLogin": 1795702870587,
       "lastLogout": 1795702870587,
       "total": 116914617,
       "counted": 1795702870587,
       "v": 2,
-      "statusAt": 1795702873710,
+      "statusAt": 1795703343620,
       "hbLeave": 1795702870587,
       "hbLast": 1795702870587,
       "hbFail": 1795536244381
@@ -74,7 +74,7 @@
     "498803": 1002,
     "498804": 1002,
     "498805": 1011,
-    "498806": 363
+    "498806": 498
   },
   "live": "1575498469047803928"
 }
