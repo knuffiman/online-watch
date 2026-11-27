@@ -11,9 +11,9 @@
       "total": 4143703,
       "counted": 1795740186139,
       "v": 2,
-      "statusAt": 1795795141707,
+      "statusAt": 1795795154126,
       "hbLeave": 1795744083823,
-      "offSeen": 1795795141707,
+      "offSeen": 1795795154126,
       "hbLast": 1795740186139,
       "hbFail": 1795550432577
     },
@@ -28,7 +28,7 @@
       "total": 38656778,
       "counted": 1795790611947,
       "v": 2,
-      "statusAt": 1795795141821,
+      "statusAt": 1795795154235,
       "hbLeave": 1795790607127,
       "offSeen": 1795790708469,
       "hbLast": 1795790617637,
@@ -37,17 +37,16 @@
     "_gggaming": {
       "uuid": "562fe7f8702045da9182379182dead73",
       "shown": "_gggaming",
-      "online": true,
-      "where": "Skyblock / Dynamic",
-      "server": "Skyblock \u2013 Private Island",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795791471432,
-      "lastLogout": 1795791387510,
-      "total": 146393581,
-      "counted": 1795791377350,
+      "lastLogout": 1795795154779,
+      "total": 150076928,
+      "counted": 1795791471432,
       "v": 2,
-      "statusAt": 1795795141931,
-      "hbLeave": 1795791370808,
-      "offSeen": 1795791461360,
+      "statusAt": 1795795157001,
+      "hbLeave": 1795795154779,
       "hbLast": 1795791469484,
       "hbFail": 1795761215490
     }
@@ -77,7 +76,7 @@
     "498828": 1020,
     "498829": 1017,
     "498830": 1017,
-    "498831": 1002
+    "498831": 1005
   },
   "live": "1575878400701366407"
 }
