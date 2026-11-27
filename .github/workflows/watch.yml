@@ -52,8 +52,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           TEST_RATTER: ${{ inputs.test_ratter }}
           # RATTER alarm: pings after the alarm card; seconds to wait for the mod's join code
+          # before alarming. 0 alarmed in the very round Hypixel first showed online, before the
+          # mod's code (sent at join, up to ~15 s with retries) could be read -> false alarms on a
+          # normal join with the mod, above all on a rejoin right after a leave. 45 s is well above
+          # the mod's latency and still flags a real login without the mod within 45 s.
           RAT_PINGS: 3
-          HB_WAIT: 0
+          HB_WAIT: 45
           # seconds between two Hypixel rounds, and between two reads of the mod codes (Discord)
           EVERY: 10
           FAST: 1
