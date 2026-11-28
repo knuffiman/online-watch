@@ -3,17 +3,16 @@
     "mrkioko": {
       "uuid": "2c8d3d5f841540c0987e06d889f1bf02",
       "shown": "mrkioko",
-      "online": true,
-      "where": "Skyblock / Crystal Hollows",
-      "server": "Skyblock \u2013 Crystal Hollows",
+      "online": false,
+      "where": null,
+      "server": null,
       "lastLogin": 1795851065746,
-      "lastLogout": 1795850834536,
-      "total": 4152962,
-      "counted": 1795850825277,
+      "lastLogout": 1795867886209,
+      "total": 20973425,
+      "counted": 1795851065746,
       "v": 2,
-      "statusAt": 1795867706740,
-      "hbLeave": 1795850834536,
-      "offSeen": 1795851064557,
+      "statusAt": 1795867892826,
+      "hbLeave": 1795867886209,
       "hbLast": 1795851065746,
       "hbFail": 1795550432577
     },
@@ -28,9 +27,9 @@
       "total": 47313159,
       "counted": 1795790719150,
       "v": 2,
-      "statusAt": 1795867706805,
+      "statusAt": 1795867885770,
       "hbLeave": 1795799375531,
-      "offSeen": 1795867706805,
+      "offSeen": 1795867885770,
       "hbLast": 1795790617637,
       "hbFail": 1795789032656
     },
@@ -45,7 +44,7 @@
       "total": 161380838,
       "counted": 1795803854893,
       "v": 2,
-      "statusAt": 1795867706850,
+      "statusAt": 1795867885817,
       "hbLeave": 1795798438004,
       "offSeen": 1795841694412,
       "hbLast": 1795841699593,
@@ -77,7 +76,7 @@
     "498849": 1008,
     "498850": 1008,
     "498851": 1017,
-    "498852": 144
+    "498852": 195
   },
   "live": "1576195544697675849"
 }
